@@ -27,13 +27,17 @@ jobs:
         run: ./node_modules/.bin/prisma --version
         env:
           DATABASE_URL: ${{ secrets.DIRECT_URL }}
-          
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+
+
       - name: Prisma generate
         run: ./node_modules/.bin/prisma generate
         env:
           DATABASE_URL: ${{ secrets.DIRECT_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
 
       - name: Prisma migrate deploy (direct)
         run: ./node_modules/.bin/prisma migrate deploy
         env:
           DATABASE_URL: ${{ secrets.DIRECT_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
