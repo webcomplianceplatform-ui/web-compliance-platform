@@ -7,6 +7,8 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// --- Enums ---
+
 enum TenantStatus {
   TRIAL
   ACTIVE
@@ -21,21 +23,25 @@ enum UserRole {
 }
 
 enum TicketType {
-  CONTENT
+  CHANGE_REQUEST
+  INCIDENT
   LEGAL
-  TECHNICAL
-}
-
-enum TicketPriority {
-  NORMAL
-  URGENT
+  SEO
 }
 
 enum TicketStatus {
   OPEN
   IN_PROGRESS
-  DONE
+  WAITING_CLIENT
+  RESOLVED
   CLOSED
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
 }
 
 enum CheckType {
@@ -49,12 +55,14 @@ enum CheckStatus {
   FAIL
 }
 
+// --- Models ---
+
 model Tenant {
   id        String       @id @default(uuid())
   slug      String       @unique
   name      String
   status    TenantStatus @default(TRIAL)
-  themeJson Json?        // colores, tipografía, logo, etc.
+  themeJson Json? // colores, tipografía, logo, etc.
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
 
@@ -65,15 +73,16 @@ model Tenant {
 }
 
 model User {
-  id        String       @id @default(uuid())
-  email     String       @unique
-  name      String?
-  passwordHash      String?
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
+  id           String   @id @default(uuid())
+  email        String   @unique
+  name         String?
+  passwordHash String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  memberships UserTenant[]
-  ticketsCreated Ticket[] @relation("TicketCreatedBy")
+  memberships    UserTenant[]
+  ticketsCreated Ticket[]        @relation("TicketCreatedBy")
+  comments       TicketComment[] @relation("TicketCommentAuthor")
 }
 
 model UserTenant {
@@ -92,37 +101,47 @@ model UserTenant {
 }
 
 model Ticket {
-  id          String         @id @default(uuid())
+  id          String         @id @default(cuid())
   tenantId    String
   createdById String
-  type        TicketType
-  priority    TicketPriority @default(NORMAL)
-  status      TicketStatus   @default(OPEN)
   title       String
-  description String?
-  attachments Json?
+  description String
+  type        TicketType     @default(CHANGE_REQUEST)
+  status      TicketStatus   @default(OPEN)
+  priority    TicketPriority @default(MEDIUM)
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
 
-  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  createdBy User  @relation("TicketCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
+  tenant    Tenant          @relation(fields: [tenantId], references: [id])
+  createdBy User            @relation("TicketCreatedBy", fields: [createdById], references: [id])
+  comments  TicketComment[]
+}
 
-  @@index([tenantId])
-  @@index([createdById])
+model TicketComment {
+  id        String   @id @default(cuid())
+  ticketId  String
+  authorId  String
+  body      String
+  createdAt DateTime @default(now())
+
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  author User   @relation("TicketCommentAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId, createdAt])
 }
 
 model MonitorCheck {
-  id        String      @id @default(uuid())
-  tenantId  String
-  type      CheckType
-  targetUrl String
-  intervalM Int         @default(10) // minutos
+  id         String       @id @default(uuid())
+  tenantId   String
+  type       CheckType
+  targetUrl  String
+  intervalM  Int          @default(10) // minutos
   lastStatus CheckStatus?
-  lastRunAt DateTime?
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
+  lastRunAt  DateTime?
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
 
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   events MonitorEvent[]
 
   @@index([tenantId])
@@ -138,7 +157,7 @@ model MonitorEvent {
   metaJson  Json?
   createdAt DateTime    @default(now())
 
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   check  MonitorCheck? @relation(fields: [checkId], references: [id], onDelete: SetNull)
 
   @@index([tenantId])

@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { AppNav } from "@/components/app/AppNav";
 
 export default async function TenantAppLayout({
   children,
@@ -31,13 +32,13 @@ export default async function TenantAppLayout({
 
   if (!membership) redirect("/login");
 
-  return (
-    <div className="min-h-screen">
-      <div className="border-b p-4 text-sm">
-        Tenant: <span className="font-mono">{tenant}</span> — Role:{" "}
-        <span className="font-mono">{membership.role}</span>
-      </div>
-      <div className="p-6">{children}</div>
+return (
+  <div className="min-h-screen bg-muted/30">
+    <AppNav tenant={tenant} role={membership.role} />
+    <div className="mx-auto max-w-6xl p-4 md:p-6">
+      <div className="rounded-xl border bg-white p-4 md:p-6">{children}</div>
     </div>
-  );
+  </div>
+);
+
 }
