@@ -34,6 +34,12 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DIRECT_URL }}
 
+      - name: Show DB host (safe)
+        run: node -e "try{const u=new URL(process.env.DATABASE_URL); console.log('HOST='+u.host);}catch(e){console.log('bad url')}"
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+
       - name: Prisma migrate deploy (direct)
         run: ./node_modules/.bin/prisma migrate deploy
         env:
