@@ -1,0 +1,146 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum TenantStatus {
+  TRIAL
+  ACTIVE
+  PAUSED
+}
+
+enum UserRole {
+  OWNER
+  ADMIN
+  CLIENT
+  VIEWER
+}
+
+enum TicketType {
+  CONTENT
+  LEGAL
+  TECHNICAL
+}
+
+enum TicketPriority {
+  NORMAL
+  URGENT
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  DONE
+  CLOSED
+}
+
+enum CheckType {
+  UPTIME
+  SSL
+}
+
+enum CheckStatus {
+  OK
+  WARN
+  FAIL
+}
+
+model Tenant {
+  id        String       @id @default(uuid())
+  slug      String       @unique
+  name      String
+  status    TenantStatus @default(TRIAL)
+  themeJson Json?        // colores, tipografía, logo, etc.
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  memberships UserTenant[]
+  tickets     Ticket[]
+  checks      MonitorCheck[]
+  events      MonitorEvent[]
+}
+
+model User {
+  id        String       @id @default(uuid())
+  email     String       @unique
+  name      String?
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  memberships UserTenant[]
+  ticketsCreated Ticket[] @relation("TicketCreatedBy")
+}
+
+model UserTenant {
+  id        String   @id @default(uuid())
+  userId    String
+  tenantId  String
+  role      UserRole @default(CLIENT)
+  createdAt DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tenantId])
+  @@index([tenantId])
+  @@index([userId])
+}
+
+model Ticket {
+  id          String         @id @default(uuid())
+  tenantId    String
+  createdById String
+  type        TicketType
+  priority    TicketPriority @default(NORMAL)
+  status      TicketStatus   @default(OPEN)
+  title       String
+  description String?
+  attachments Json?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdBy User  @relation("TicketCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([createdById])
+}
+
+model MonitorCheck {
+  id        String      @id @default(uuid())
+  tenantId  String
+  type      CheckType
+  targetUrl String
+  intervalM Int         @default(10) // minutos
+  lastStatus CheckStatus?
+  lastRunAt DateTime?
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  events MonitorEvent[]
+
+  @@index([tenantId])
+}
+
+model MonitorEvent {
+  id        String      @id @default(uuid())
+  tenantId  String
+  checkId   String?
+  status    CheckStatus
+  severity  Int         @default(1) // 1 info, 2 warn, 3 critical
+  message   String
+  metaJson  Json?
+  createdAt DateTime    @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  check  MonitorCheck? @relation(fields: [checkId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([checkId])
+}
