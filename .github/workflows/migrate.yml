@@ -25,7 +25,9 @@ jobs:
 
       - name: Prisma version (sanity check)
         run: ./node_modules/.bin/prisma --version
-
+        env:
+          DATABASE_URL: ${{ secrets.DIRECT_URL }}
+          
       - name: Prisma generate
         run: ./node_modules/.bin/prisma generate
         env:
