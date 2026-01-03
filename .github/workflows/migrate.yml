@@ -5,30 +5,33 @@ on:
   push:
     paths:
       - "prisma/**"
+      - "prisma.config.ts"
       - ".github/workflows/migrate.yml"
+      - "package.json"
+      - "package-lock.json"
 
 jobs:
   migrate:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Prisma generate
-        run: npx prisma generate
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+      - name: Prisma version (sanity check)
+        run: ./node_modules/.bin/prisma --version
 
-      - name: Migrate deploy (force direct)
-        run: npx prisma migrate deploy
+      - name: Prisma generate
+        run: ./node_modules/.bin/prisma generate
+        env:
+          DATABASE_URL: ${{ secrets.DIRECT_URL }}
+
+      - name: Prisma migrate deploy (direct)
+        run: ./node_modules/.bin/prisma migrate deploy
         env:
           DATABASE_URL: ${{ secrets.DIRECT_URL }}
