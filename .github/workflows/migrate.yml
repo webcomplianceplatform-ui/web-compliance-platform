@@ -39,6 +39,4 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
       - name: Prisma migrate deploy
-        run: ./node_modules/.bin/prisma migrate deploy
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: echo "Skipping migrate deploy (applied manually in Supabase SQL Editor)"
