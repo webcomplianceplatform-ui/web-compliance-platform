@@ -26,21 +26,19 @@ jobs:
       - name: Prisma version (sanity check)
         run: ./node_modules/.bin/prisma --version
         env:
-          DATABASE_URL: ${{ secrets.DIRECT_URL }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
+      - name: Show DB host (safe)
+        run: node -e "const u=new URL(process.env.DATABASE_URL); console.log('HOST='+u.host)"
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
       - name: Prisma generate
         run: ./node_modules/.bin/prisma generate
         env:
-          DATABASE_URL: ${{ secrets.DIRECT_URL }}
-
-      - name: Show DB host (safe)
-        run: node -e "try{const u=new URL(process.env.DATABASE_URL); console.log('HOST='+u.host);}catch(e){console.log('bad url')}"
-        env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
-
-      - name: Prisma migrate deploy (direct)
+      - name: Prisma migrate deploy
         run: ./node_modules/.bin/prisma migrate deploy
         env:
-          DATABASE_URL: ${{ secrets.DIRECT_URL }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
