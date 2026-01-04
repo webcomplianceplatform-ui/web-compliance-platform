@@ -1,7 +1,11 @@
-import Link from "next/link";
 import { getPublicTenant } from "@/lib/public-tenant";
+import type { Metadata } from "next";
+export async function generateMetadata({ params }: { params: Promise<{ tenant: string }> }): Promise<Metadata> {
+  const { tenant } = await params;
+  return { title: `Servicios | ${tenant}` };
+}
 
-export default async function ServiciosPage({
+export default async function ServicesPage({
   params,
 }: {
   params: Promise<{ tenant: string }>;
@@ -14,36 +18,22 @@ export default async function ServiciosPage({
 
   return (
     <main className="space-y-6">
-      <div className="flex items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold">Servicios</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Lo que ofrecemos para <span className="font-mono">{tenant}</span>
-          </p>
+      <h1 className="text-2xl font-semibold">Servicios</h1>
+
+      {services.length === 0 ? (
+        <div className="rounded-xl border p-4 text-sm text-muted-foreground">
+          Aún no hay servicios configurados.
         </div>
-
-        <Link
-          href={`/t/${tenant}/contacto`}
-          className="rounded bg-black px-4 py-2 text-sm text-white"
-        >
-          Pedir propuesta
-        </Link>
-      </div>
-
-      <div className="grid gap-3 md:grid-cols-2">
-        {services.map((s, idx) => (
-          <div key={idx} className="rounded-2xl border p-5">
-            <div className="text-lg font-medium">{s.title}</div>
-            <div className="mt-2 text-sm text-muted-foreground">{s.description}</div>
-          </div>
-        ))}
-
-        {services.length === 0 ? (
-          <div className="rounded-2xl border p-5 text-sm text-muted-foreground">
-            No hay servicios configurados todavía.
-          </div>
-        ) : null}
-      </div>
+      ) : (
+        <div className="grid gap-3 md:grid-cols-3">
+          {services.map((s, i) => (
+            <div key={i} className="rounded-xl border p-4">
+              <div className="font-medium">{s.title}</div>
+              <div className="mt-2 text-sm text-muted-foreground">{s.description}</div>
+            </div>
+          ))}
+        </div>
+      )}
     </main>
   );
 }

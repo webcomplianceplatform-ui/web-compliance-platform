@@ -36,7 +36,7 @@ export default async function TenantPublicLayout({
       }
     >
       <header
-        className="border-b"
+        className="relative border-b"
         style={{ borderColor: "color-mix(in srgb, var(--brand-primary) 18%, transparent)" }}
       >
         <div className="mx-auto flex max-w-5xl items-center justify-between p-4">
@@ -69,6 +69,19 @@ export default async function TenantPublicLayout({
       </header>
 
       <div className="mx-auto max-w-5xl p-6">{children}</div>
+      <footer className="mt-12 border-t py-8 text-sm text-muted-foreground">
+  <div className="mx-auto max-w-5xl px-6">
+    <div className="flex flex-wrap gap-4">
+      <Link className="hover:underline" href={`/t/${tenant}/aviso-legal`}>Aviso legal</Link>
+      <Link className="hover:underline" href={`/t/${tenant}/privacidad`}>Privacidad</Link>
+      <Link className="hover:underline" href={`/t/${tenant}/cookies`}>Cookies</Link>
+    </div>
+    <div className="mt-3 text-xs">
+      © {new Date().getFullYear()} {brandName}
+    </div>
+  </div>
+</footer>
+
     </div>
   );
 }

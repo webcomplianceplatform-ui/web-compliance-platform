@@ -215,6 +215,118 @@ export default function SettingsClient({ tenant }: { tenant: string }) {
             placeholder="https://..."
           />
         </label>
+<div className="mt-6 text-sm font-medium">Legal</div>
+
+<div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+  <label className="block text-sm">
+    Razón social (Company)
+    <input
+      className="mt-1 w-full rounded border p-2"
+      value={theme.legal?.companyName ?? ""}
+      onChange={(e) =>
+        setTheme({ ...theme, legal: { ...(theme.legal ?? {}), companyName: e.target.value } })
+      }
+      placeholder="Empresa S.L."
+    />
+  </label>
+
+  <label className="block text-sm">
+    Nombre comercial (opcional)
+    <input
+      className="mt-1 w-full rounded border p-2"
+      value={theme.legal?.tradeName ?? ""}
+      onChange={(e) =>
+        setTheme({ ...theme, legal: { ...(theme.legal ?? {}), tradeName: e.target.value } })
+      }
+      placeholder="Marca / Nombre comercial"
+    />
+  </label>
+
+  <label className="block text-sm">
+    CIF/NIF
+    <input
+      className="mt-1 w-full rounded border p-2"
+      value={theme.legal?.cifNif ?? ""}
+      onChange={(e) =>
+        setTheme({ ...theme, legal: { ...(theme.legal ?? {}), cifNif: e.target.value } })
+      }
+      placeholder="B12345678"
+    />
+  </label>
+
+  <label className="block text-sm">
+    Email legal/soporte
+    <input
+      className="mt-1 w-full rounded border p-2"
+value={theme.legal?.email ?? theme.pages?.contact?.email ?? ""}
+      onChange={(e) =>
+        setTheme({ ...theme, legal: { ...(theme.legal ?? {}), email: e.target.value } })
+      }
+      placeholder="info@empresa.com"
+    />
+  </label>
+
+  <label className="block text-sm md:col-span-2">
+    Dirección
+    <input
+      className="mt-1 w-full rounded border p-2"
+      value={theme.legal?.address ?? ""}
+      onChange={(e) =>
+        setTheme({ ...theme, legal: { ...(theme.legal ?? {}), address: e.target.value } })
+      }
+      placeholder="Calle / número / piso"
+    />
+  </label>
+
+  <label className="block text-sm">
+    Ciudad
+    <input
+      className="mt-1 w-full rounded border p-2"
+      value={theme.legal?.city ?? ""}
+      onChange={(e) =>
+        setTheme({ ...theme, legal: { ...(theme.legal ?? {}), city: e.target.value } })
+      }
+      placeholder="Madrid"
+    />
+  </label>
+
+  <label className="block text-sm">
+    País
+    <input
+      className="mt-1 w-full rounded border p-2"
+      value={theme.legal?.country ?? "España"}
+      onChange={(e) =>
+        setTheme({ ...theme, legal: { ...(theme.legal ?? {}), country: e.target.value } })
+      }
+      placeholder="España"
+    />
+  </label>
+
+  <label className="flex items-center gap-2 text-sm md:col-span-2">
+    <input
+      type="checkbox"
+      checked={!!theme.legal?.usesAnalytics}
+      onChange={(e) =>
+        setTheme({ ...theme, legal: { ...(theme.legal ?? {}), usesAnalytics: e.target.checked } })
+      }
+    />
+    Usa analítica / medición (cookies)
+  </label>
+
+  {theme.legal?.usesAnalytics ? (
+    <label className="block text-sm md:col-span-2">
+      Proveedor de analítica
+      <input
+        className="mt-1 w-full rounded border p-2"
+        value={theme.legal?.analyticsProvider ?? "Google Analytics"}
+        onChange={(e) =>
+          setTheme({ ...theme, legal: { ...(theme.legal ?? {}), analyticsProvider: e.target.value } })
+        }
+        placeholder="Google Analytics"
+      />
+    </label>
+  ) : null}
+</div>
 
         <button
           className="rounded bg-black px-3 py-2 text-sm text-white"

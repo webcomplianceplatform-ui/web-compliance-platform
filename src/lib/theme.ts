@@ -1,30 +1,78 @@
 export type TenantTheme = {
-  brandName: string;
-  tagline?: string;
-  logoUrl?: string;
-
-  primary?: string;
-  accent?: string;
+brandName?: string | null;
+  logoUrl?: string | null;
+  tagline?: string | null;
+  primary?: string | null;
+  accent?: string | null;
 
   hero?: {
-    headline: string;
-    subheadline?: string;
-    ctaText?: string;
-    ctaHref?: string;
-  };
-
-  pages?: {
-    services?: { title: string; description: string }[];
-    about?: { title: string; body: string };
-    contact?: { title?: string; email?: string; phone?: string; address?: string };
-  };
+    headline?: string | null;
+    subheadline?: string | null;
+    ctaText?: string | null;
+    ctaHref?: string | null;
+  } | null;
 
   seo?: {
-    title?: string;
-    description?: string;
-    ogImageUrl?: string;
-  };
+    title?: string | null;
+    description?: string | null;
+    ogImageUrl?: string | null;
+  } | null;
+
+ pages?: {
+  services?: { title: string; description: string }[];
+  about?: { title?: string | null; body?: string | null } | null;
+  contact?: {
+    title?: string | null;
+    email?: string | null;
+    phone?: string | null;
+    address?: string | null;
+  } | null;
+} | null;
+
+
+  // ✅ NUEVO: Legal
+  legal?: {
+    companyName?: string | null;
+    tradeName?: string | null; // si usan nombre comercial
+    cifNif?: string | null;
+    address?: string | null;
+    city?: string | null;
+    country?: string | null;
+    email?: string | null;
+    phone?: string | null;
+
+    // cookies / analytics
+    usesAnalytics?: boolean | null; // Google Analytics, etc
+    analyticsProvider?: string | null; // "Google Analytics", "Plausible", etc
+  } | null;
 };
+export function sanitizeTheme(input: any) {
+  const t = input ?? {};
+  return {
+    brandName: t.brandName ?? null,
+    logoUrl: t.logoUrl ?? null,
+    tagline: t.tagline ?? null,
+    primary: t.primary ?? null,
+    accent: t.accent ?? null,
+    hero: t.hero ?? null,
+    seo: t.seo ?? null,
+    pages: t.pages ?? null,
+
+    // ✅ NUEVO
+    legal: {
+      companyName: t.legal?.companyName ?? null,
+      tradeName: t.legal?.tradeName ?? null,
+      cifNif: t.legal?.cifNif ?? null,
+      address: t.legal?.address ?? null,
+      city: t.legal?.city ?? null,
+      country: t.legal?.country ?? null,
+      email: t.legal?.email ?? null,
+      phone: t.legal?.phone ?? null,
+      usesAnalytics: !!t.legal?.usesAnalytics,
+      analyticsProvider: t.legal?.analyticsProvider ?? null,
+    },
+  };
+}
 
 export const defaultTheme: TenantTheme = {
   brandName: "Tu negocio",
@@ -53,4 +101,17 @@ export const defaultTheme: TenantTheme = {
     title: "Web corporativa profesional",
     description: "Sitio rápido, SEO-ready y con base legal.",
   },
+  legal: {
+    companyName: "",
+    tradeName: "",
+    cifNif: "",
+    address: "",
+    city: "",
+    country: "España",
+    email: "",
+    phone: "",
+    usesAnalytics: false,
+    analyticsProvider: "Google Analytics",
+  },
 };
+

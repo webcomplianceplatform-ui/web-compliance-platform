@@ -71,6 +71,20 @@ export function sanitizeTheme(input: any): TenantTheme {
     if (typeof input.seo.description === "string") theme.seo.description = input.seo.description;
     if (typeof input.seo.ogImageUrl === "string") theme.seo.ogImageUrl = safeUrl(input.seo.ogImageUrl);
   }
+  if (isObject(input?.legal)) {
+    theme.legal = {};
+    if (typeof input.legal.companyName === "string") theme.legal.companyName = input.legal.companyName;
+    if (typeof input.legal.tradeName === "string") theme.legal.tradeName = input.legal.tradeName;
+    if (typeof input.legal.cifNif === "string") theme.legal.cifNif = input.legal.cifNif;
+    if (typeof input.legal.address === "string") theme.legal.address = input.legal.address;
+    if (typeof input.legal.city === "string") theme.legal.city = input.legal.city;
+    if (typeof input.legal.country === "string") theme.legal.country = input.legal.country;
+    if (typeof input.legal.email === "string") theme.legal.email = input.legal.email;
+    if (typeof input.legal.phone === "string") theme.legal.phone = input.legal.phone;
+
+    if (typeof input.legal.usesAnalytics === "boolean") theme.legal.usesAnalytics = input.legal.usesAnalytics;
+    if (typeof input.legal.analyticsProvider === "string") theme.legal.analyticsProvider = input.legal.analyticsProvider;
+  }
 
   return deepMerge(defaultTheme, theme);
 }

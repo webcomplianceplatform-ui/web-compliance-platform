@@ -1,6 +1,11 @@
 import { getPublicTenant } from "@/lib/public-tenant";
+import type { Metadata } from "next";
+export async function generateMetadata({ params }: { params: Promise<{ tenant: string }> }): Promise<Metadata> {
+  const { tenant } = await params;
+  return { title: `Servicios | ${tenant}` };
+}
 
-export default async function SobrePage({
+export default async function AboutPage({
   params,
 }: {
   params: Promise<{ tenant: string }>;
@@ -9,25 +14,24 @@ export default async function SobrePage({
   const data = await getPublicTenant(tenant);
   if (!data) return <div>Tenant not found</div>;
 
-  const about = data.theme.pages?.about;
+  const brandName = data.theme.brandName ?? data.tenant.name;
 
   return (
-    <main className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">{about?.title ?? "Sobre"}</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {data.theme.tagline ?? "Conoce más sobre nosotros"}
-        </p>
-      </div>
+    <main className="space-y-4">
+      <h1 className="text-2xl font-semibold">Sobre {brandName}</h1>
 
-      <section className="rounded-2xl border p-6">
-        <div className="prose max-w-none">
-          <p className="text-muted-foreground whitespace-pre-line">
-            {about?.body ??
-              "Aquí irá tu texto de 'Sobre nosotros'. Puedes editarlo desde el panel (theme)."}
-          </p>
-        </div>
-      </section>
+      <p className="text-sm text-muted-foreground">
+        Página “Sobre” (MVP). Aquí meteremos contenido editable por cliente (CMS) o desde Settings.
+      </p>
+
+      <div className="rounded-xl border p-4 text-sm">
+        <div className="font-medium">Nuestra propuesta</div>
+        <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
+          <li>Web corporativa rápida (SEO-ready)</li>
+          <li>Base legal (privacidad / cookies / términos)</li>
+          <li>Soporte por tickets + monitorización</li>
+        </ul>
+      </div>
     </main>
   );
 }
