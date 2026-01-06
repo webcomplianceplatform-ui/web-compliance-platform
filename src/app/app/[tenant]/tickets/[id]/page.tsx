@@ -62,23 +62,28 @@ export default async function TicketDetailPage({
         tenant={tenant}
         ticketId={ticket.id}
         canManage={isManager}
+        currentType={ticket.type}
         currentStatus={ticket.status}
         currentPriority={ticket.priority}
       />
 
       <section className="space-y-3">
-        <h2 className="text-lg font-semibold">Comments</h2>
+        <h2 className="text-lg font-semibold">Activity</h2>
 
         <div className="space-y-2">
-          {ticket.comments.map((c) => (
-            <div key={c.id} className="rounded border p-3">
-              <div className="text-xs text-muted-foreground">
-                {c.author.name ?? c.author.email} ·{" "}
-                {new Date(c.createdAt).toLocaleString()}
+          {ticket.comments.map((c) => {
+            const isSystem = c.body.startsWith("[SYSTEM]");
+            const body = isSystem ? c.body.replace(/^\[SYSTEM\]\s*/, "") : c.body;
+            return (
+              <div key={c.id} className={`rounded border p-3 ${isSystem ? "bg-muted/30" : ""}`}>
+                <div className="text-xs text-muted-foreground">
+                  {isSystem ? "System" : c.author.name ?? c.author.email} ·{" "}
+                  {new Date(c.createdAt).toLocaleString()}
+                </div>
+                <div className={`mt-2 whitespace-pre-wrap text-sm ${isSystem ? "italic" : ""}`}>{body}</div>
               </div>
-              <div className="mt-2 whitespace-pre-wrap text-sm">{c.body}</div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </section>
     </main>

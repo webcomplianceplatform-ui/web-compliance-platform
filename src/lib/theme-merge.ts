@@ -4,6 +4,23 @@ function isObject(v: unknown): v is Record<string, any> {
   return !!v && typeof v === "object" && !Array.isArray(v);
 }
 
+
+function sanitizeEmailList(list: unknown): string[] {
+  if (!Array.isArray(list)) return [];
+  const out: string[] = [];
+  for (const v of list) {
+    if (typeof v !== "string") continue;
+    const s = v.trim();
+    if (!s) continue;
+    // Simple email sanity check (MVP)
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s)) continue;
+    out.push(s.toLowerCase());
+  }
+  // de-dup
+  return Array.from(new Set(out)).slice(0, 10);
+}
+
+
 function deepMerge<T>(base: T, patch: any): T {
   if (!isObject(patch)) return base;
 
@@ -22,6 +39,17 @@ function safeUrl(u?: string) {
   if (!u) return u;
   const s = u.trim();
   if (s.startsWith("javascript:")) return "";
+  return s;
+}
+
+// Paths internos del site público. MVP: solo permitimos rutas relativas ("/contacto", etc.)
+function safePath(p?: string) {
+  if (!p) return p;
+  const s = p.trim();
+  if (!s.startsWith("/")) return "";
+  if (s.startsWith("//")) return "";
+  // evita esquemas tipo "/\njavascript:..." o cosas raras
+  if (s.toLowerCase().includes("javascript:")) return "";
   return s;
 }
 
@@ -70,7 +98,23 @@ export function sanitizeTheme(input: any): TenantTheme {
     if (typeof input.seo.title === "string") theme.seo.title = input.seo.title;
     if (typeof input.seo.description === "string") theme.seo.description = input.seo.description;
     if (typeof input.seo.ogImageUrl === "string") theme.seo.ogImageUrl = safeUrl(input.seo.ogImageUrl);
+    if (typeof input.seo.faviconUrl === "string") theme.seo.faviconUrl = safeUrl(input.seo.faviconUrl);
   }
+
+  if (isObject(input?.navigation)) {
+    theme.navigation = {};
+    if (Array.isArray(input.navigation.primary)) {
+      theme.navigation.primary = input.navigation.primary
+        .filter((x: any) => typeof x?.label === "string" && typeof x?.href === "string")
+        .map((x: any) => ({
+          label: String(x.label).slice(0, 40),
+          href: safePath(String(x.href)),
+        }))
+        .filter((x: any) => x.href)
+        .slice(0, 12);
+    }
+  }
+
   if (isObject(input?.legal)) {
     theme.legal = {};
     if (typeof input.legal.companyName === "string") theme.legal.companyName = input.legal.companyName;
@@ -84,7 +128,18 @@ export function sanitizeTheme(input: any): TenantTheme {
 
     if (typeof input.legal.usesAnalytics === "boolean") theme.legal.usesAnalytics = input.legal.usesAnalytics;
     if (typeof input.legal.analyticsProvider === "string") theme.legal.analyticsProvider = input.legal.analyticsProvider;
+    if (typeof input.legal.analyticsId === "string") theme.legal.analyticsId = input.legal.analyticsId;
+
+    if (typeof input.legal.lastUpdated === "string") theme.legal.lastUpdated = String(input.legal.lastUpdated).slice(0, 40);
   }
+
+
+if (isObject(input?.notifications)) {
+  theme.notifications = {
+    ticketEmails: sanitizeEmailList((input.notifications as any).ticketEmails),
+    monitorEmails: sanitizeEmailList((input.notifications as any).monitorEmails),
+  };
+}
 
   return deepMerge(defaultTheme, theme);
 }

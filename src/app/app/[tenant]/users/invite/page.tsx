@@ -34,17 +34,21 @@ export default function InvitePage({
           className="rounded bg-black px-3 py-2 text-white"
           onClick={async () => {
             setResult(null);
-            const res = await fetch("/api/app/invite-user", {
+            const res = await fetch(`/api/app/tenants/${tenantSlug}/users`, {
               method: "POST",
               headers: { "content-type": "application/json" },
-              body: JSON.stringify({ tenantSlug, email, name, role }),
+              body: JSON.stringify({ email, name, role }),
             });
             const data = await res.json();
             if (!data.ok) {
               setResult("Error: " + (data.error ?? res.status));
               return;
             }
-            setResult("Temp password: " + data.tempPassword);
+            if (data.tempPassword) {
+              setResult("User created. Temp password: " + data.tempPassword);
+            } else {
+              setResult("User added/updated in tenant.");
+            }
           }}
         >
           Create invite

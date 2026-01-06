@@ -1,11 +1,26 @@
 import type { MetadataRoute } from "next";
+import { prisma } from "@/lib/db";
 
-export default function sitemap(): MetadataRoute.Sitemap {
-  const base = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
-  const now = new Date();
+const baseUrl = process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000";
 
-  return [
-    { url: `${base}/`, lastModified: now },
-    { url: `${base}/login`, lastModified: now },
-  ];
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const tenants = await prisma.tenant.findMany({
+    select: { slug: true, updatedAt: true },
+    take: 500,
+  });
+
+  const staticPages = ["", "/servicios", "/sobre", "/contacto", "/legal/aviso", "/legal/privacidad", "/legal/cookies"];
+
+  const out: MetadataRoute.Sitemap = [];
+
+  for (const t of tenants) {
+    for (const p of staticPages) {
+      out.push({
+        url: `${baseUrl}/t/${t.slug}${p}`,
+        lastModified: t.updatedAt,
+      });
+    }
+  }
+
+  return out;
 }

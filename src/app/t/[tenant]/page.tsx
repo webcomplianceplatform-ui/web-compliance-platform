@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { getPublicTenant } from "@/lib/public-tenant";
 import type { Metadata } from "next";
+import { getBaseUrl, publicCanonical } from "@/lib/seo";
+import { pageTitle } from "@/lib/seo-titles";
 
 export async function generateMetadata({
   params,
@@ -11,16 +13,22 @@ export async function generateMetadata({
   const data = await getPublicTenant(tenant);
   if (!data) return { title: "Not found" };
 
-  const title = data.theme.seo?.title ?? data.theme.brandName ?? data.tenant.name;
+  const brand = data.theme.brandName ?? data.tenant.name;
+  const title = data.theme.seo?.title ?? pageTitle(brand, "Home");
   const description = data.theme.seo?.description ?? data.theme.tagline ?? "Web corporativa";
 
+  const og = data.theme.seo?.ogImageUrl || `${getBaseUrl()}/og-default.png`;
+
+  const canonical = publicCanonical(tenant, "");
   return {
     title,
     description,
+    alternates: { canonical },
     openGraph: {
       title,
       description,
-      images: data.theme.seo?.ogImageUrl ? [data.theme.seo.ogImageUrl] : [],
+      url: canonical,
+      images: og ? [og] : [],
     },
   };
 }

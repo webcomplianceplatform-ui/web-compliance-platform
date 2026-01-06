@@ -1,37 +1,40 @@
-import { getPublicTenant } from "@/lib/public-tenant";
 import type { Metadata } from "next";
+import { getPublicTenant } from "@/lib/public-tenant";
+import { getBaseUrl, publicCanonical } from "@/lib/seo";
+import { pageTitle } from "@/lib/seo-titles";
+
 export async function generateMetadata({ params }: { params: Promise<{ tenant: string }> }): Promise<Metadata> {
   const { tenant } = await params;
-  return { title: `Servicios | ${tenant}` };
+  const data = await getPublicTenant(tenant);
+  if (!data) return { title: "Not found" };
+
+  const brand = data.theme.brandName ?? data.tenant.name;
+  const title = pageTitle(brand, "Sobre");
+  const description = data.theme.seo?.description ?? data.theme.tagline ?? "Sobre";
+  const canonical = publicCanonical(tenant, "/sobre");
+  const og = data.theme.seo?.ogImageUrl || `${getBaseUrl()}/og-default.png`;
+
+  return {
+    title,
+    description,
+    alternates: { canonical },
+    openGraph: { title, description, url: canonical, images: og ? [og] : [] },
+  };
 }
 
-export default async function AboutPage({
-  params,
-}: {
-  params: Promise<{ tenant: string }>;
-}) {
+export default async function Page({ params }: { params: Promise<{ tenant: string }> }) {
   const { tenant } = await params;
   const data = await getPublicTenant(tenant);
   if (!data) return <div>Tenant not found</div>;
 
-  const brandName = data.theme.brandName ?? data.tenant.name;
-
+  const about = (data.theme.pages as any)?.about; // si lo tipaste ya, quita el any
   return (
     <main className="space-y-4">
-      <h1 className="text-2xl font-semibold">Sobre {brandName}</h1>
-
-      <p className="text-sm text-muted-foreground">
-        Página “Sobre” (MVP). Aquí meteremos contenido editable por cliente (CMS) o desde Settings.
+      <h1 className="text-2xl font-semibold">{about?.title ?? "Sobre"}</h1>
+      <p className="text-muted-foreground whitespace-pre-wrap">
+        {about?.body ??
+          "Describe aquí quién eres, qué haces y por qué el cliente debería confiar en ti. (Luego lo conectamos a CMS)."}
       </p>
-
-      <div className="rounded-xl border p-4 text-sm">
-        <div className="font-medium">Nuestra propuesta</div>
-        <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
-          <li>Web corporativa rápida (SEO-ready)</li>
-          <li>Base legal (privacidad / cookies / términos)</li>
-          <li>Soporte por tickets + monitorización</li>
-        </ul>
-      </div>
     </main>
   );
 }

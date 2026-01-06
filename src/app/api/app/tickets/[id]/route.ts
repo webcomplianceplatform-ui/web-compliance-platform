@@ -1,47 +1,106 @@
-import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireTenantContextApi, canManageTickets } from "@/lib/tenant-auth";
-import { TicketPriority, TicketStatus } from "@prisma/client";
+import { TicketPriority, TicketStatus, TicketType } from "@prisma/client";
+import { sendEmail } from "@/lib/mailer";
+import { ticketNotificationEmail } from "@/lib/email-templates/ticket";
+import { getTicketRecipientEmails } from "@/lib/notify";
+import { z } from "zod";
+import { parseJson, jsonOk, jsonError } from "@/lib/api-helpers";
+import { getClientIp } from "@/lib/ip";
+import { rateLimit } from "@/lib/rate-limit";
+import { auditLog } from "@/lib/audit";
 
-export async function PATCH(
-  req: Request,
-  { params }: { params: { id: string } }
-) {
-  const body = (await req.json()) as {
-    tenant: string;
-    status?: TicketStatus;
-    priority?: TicketPriority;
-  };
+const UpdateTicketSchema = z.object({
+  tenant: z.string().min(1),
+  status: z.nativeEnum(TicketStatus).optional(),
+  priority: z.nativeEnum(TicketPriority).optional(),
+  type: z.nativeEnum(TicketType).optional(),
+});
 
-  const { tenant, status, priority } = body ?? {};
-  if (!tenant || (!status && !priority)) {
-    return NextResponse.json({ ok: false, error: "missing_fields" }, { status: 400 });
-  }
+export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+  const ip = getClientIp(req);
+  const rl = rateLimit({ key: `tickets:update:${ip}`, limit: 60, windowMs: 60_000 });
+  if (!rl.ok) return jsonError("rate_limited", 429, { retryAfterSec: rl.retryAfterSec });
+
+  const parsed = await parseJson(req, UpdateTicketSchema);
+  if (!parsed.ok) return parsed.res;
+
+  const { tenant, status, priority, type } = parsed.data;
+  if (!status && !priority && !type) return jsonError("missing_fields", 400);
 
   const auth = await requireTenantContextApi(tenant);
   if (!auth.ok) return auth.res;
   const { ctx } = auth;
 
-  if (!canManageTickets(ctx.role)) {
-    return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
-  }
+  if (!canManageTickets(ctx.role)) return jsonError("forbidden", 403);
 
-  // asegura tenant
   const ticket = await prisma.ticket.findFirst({
     where: { id: params.id, tenantId: ctx.tenantId },
-    select: { id: true },
+    select: { id: true, status: true, priority: true, type: true },
   });
-  if (!ticket) {
-    return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 });
+  if (!ticket) return jsonError("not_found", 404);
+
+  const updates: { status?: TicketStatus; priority?: TicketPriority; type?: TicketType } = {};
+  const changes: string[] = [];
+
+  if (status && status !== ticket.status) {
+    updates.status = status;
+    changes.push(`Status changed from ${ticket.status} to ${status}`);
+  }
+  if (priority && priority !== ticket.priority) {
+    updates.priority = priority;
+    changes.push(`Priority changed from ${ticket.priority} to ${priority}`);
+  }
+  if (type && type !== ticket.type) {
+    updates.type = type;
+    changes.push(`Type changed from ${ticket.type} to ${type}`);
   }
 
-  await prisma.ticket.update({
-    where: { id: params.id },
-    data: {
-      ...(status ? { status } : {}),
-      ...(priority ? { priority } : {}),
-    },
+  if (Object.keys(updates).length === 0) return jsonOk({ noChanges: true });
+
+  await prisma.$transaction([
+    prisma.ticket.updateMany({
+      where: { id: params.id, tenantId: ctx.tenantId },
+      data: updates,
+    }),
+    ...(changes.length
+      ? [
+          prisma.ticketComment.create({
+            data: {
+              ticketId: params.id,
+              authorId: ctx.user.id,
+              body: `[SYSTEM] ${changes.join(" · ")}`,
+            },
+          }),
+        ]
+      : []),
+  ]);
+
+  await auditLog({
+    tenantId: ctx.tenantId,
+    actorUserId: ctx.user.id,
+    action: "ticket.update",
+    targetType: "ticket",
+    targetId: params.id,
+    meta: { changes, updates },
   });
 
-  return NextResponse.json({ ok: true });
+  
+
+// Ticket status/type/priority email notification (best-effort)
+try {
+  if (changes.length > 0) {
+    const tenant = await prisma.tenant.findUnique({ where: { id: ctx.tenantId }, select: { slug: true, name: true, themeJson: true } });
+    const brand = (tenant?.themeJson as any)?.brandName || tenant?.name || "WebCompliance";
+    const url = `${process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"}/app/${tenant?.slug || tenant}/tickets/${params.id}`;
+    const message = `Ticket updated by ${ctx.user.email || "user"}:\n\n${changes.join("\n")}`;
+    const mail = ticketNotificationEmail({ brand, tenantSlug: tenant?.slug || tenant, ticketId: params.id, title: updated.title, message, url });
+    const to = await getTicketRecipientEmails({ tenantId: ctx.tenantId, ticketId: params.id, exclude: [ctx.user.email || ""] });
+    await sendEmail({ tenantId: ctx.tenantId, actorUserId: ctx.user.id, to, subject: mail.subject, text: mail.text, html: mail.html, tags: { kind: "ticket_update" } });
+  }
+} catch (e) {
+  console.error("ticket update email failed", e);
+}
+
+  return jsonOk({});
 }

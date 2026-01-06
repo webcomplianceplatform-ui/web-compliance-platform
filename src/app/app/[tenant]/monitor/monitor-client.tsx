@@ -2,6 +2,10 @@
 
 import { useMemo, useState } from "react";
 
+import EmptyState from "@/components/app/EmptyState";
+import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/components/ui/toast";
+
 type CheckType = "UPTIME" | "SSL";
 type CheckStatus = "OK" | "WARN" | "FAIL" | null;
 
@@ -10,6 +14,7 @@ type MonitorCheckRow = {
   type: CheckType;
   targetUrl: string;
   intervalM: number;
+  enabled: boolean;
   lastStatus: CheckStatus;
   lastRunAt: string | Date | null;
   createdAt: string | Date;
@@ -20,6 +25,7 @@ type MonitorEventRow = {
   status: "OK" | "WARN" | "FAIL";
   severity: number;
   message: string;
+  metaJson?: any;
   createdAt: string | Date;
   checkId: string | null;
 };
@@ -39,6 +45,7 @@ export default function MonitorClient({
   initialChecks: MonitorCheckRow[];
   initialEvents: MonitorEventRow[];
 }) {
+  const toast = useToast();
   const [checks, setChecks] = useState<MonitorCheckRow[]>(initialChecks);
   const [events, setEvents] = useState<MonitorEventRow[]>(initialEvents);
 
@@ -48,6 +55,10 @@ export default function MonitorClient({
 
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editTargetUrl, setEditTargetUrl] = useState("");
+  const [editIntervalM, setEditIntervalM] = useState(10);
 
   const byCheck = useMemo(() => {
     const m = new Map<string, MonitorEventRow[]>();
@@ -86,6 +97,7 @@ export default function MonitorClient({
 
       setTargetUrl("");
       await refresh();
+      toast.push({ variant: "success", message: "Check created" });
     } finally {
       setBusy(false);
     }
@@ -98,20 +110,92 @@ export default function MonitorClient({
       const res = await fetch("/api/app/monitor/run", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ tenant }),
+        body: JSON.stringify({ tenant, force: true }),
       });
       const data = await res.json();
       if (!data.ok) return setErr(data.error ?? "error");
 
       await refresh();
+      toast.push({ variant: "success", message: "Monitor run completed" });
     } finally {
       setBusy(false);
     }
   }
 
+  async function startEdit(c: MonitorCheckRow) {
+    setEditingId(c.id);
+    setEditTargetUrl(c.targetUrl);
+    setEditIntervalM(c.intervalM);
+  }
+
+  async function saveEdit() {
+    if (!editingId) return;
+    setErr(null);
+    setBusy(true);
+    try {
+      const res = await fetch("/api/app/monitor/checks", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ tenant, id: editingId, targetUrl: editTargetUrl.trim(), intervalM: editIntervalM }),
+      });
+      const data = await res.json();
+      if (!data.ok) return setErr(data.error ?? "error");
+      setEditingId(null);
+      await refresh();
+      toast.push({ variant: "success", message: "Check updated" });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function deleteCheck(id: string) {
+    if (!window.confirm("Delete this check?")) return;
+    setErr(null);
+    setBusy(true);
+    try {
+      const res = await fetch("/api/app/monitor/checks", {
+        method: "DELETE",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ tenant, id }),
+      });
+      const data = await res.json();
+      if (!data.ok) return setErr(data.error ?? "error");
+      await refresh();
+      toast.push({ variant: "success", message: "Check deleted" });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function toggleEnabled(c: MonitorCheckRow) {
+    setErr(null);
+    setBusy(true);
+    try {
+      const res = await fetch("/api/app/monitor/checks", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ tenant, id: c.id, enabled: !c.enabled }),
+      });
+      const data = await res.json();
+      if (!data.ok) return setErr(data.error ?? "error");
+      await refresh();
+      toast.push({ variant: "success", message: c.enabled ? "Check disabled" : "Check enabled" });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function extraEventInfo(e: MonitorEventRow) {
+    const m = e?.metaJson;
+    if (!m) return null;
+    if (typeof m.latencyMs === "number") return `latency ${m.latencyMs}ms`;
+    if (typeof m.daysLeft === "number") return `daysLeft ${m.daysLeft}`;
+    return null;
+  }
+
   return (
     <div className="space-y-6">
-      <section className="rounded-xl border bg-white p-4">
+      <section id="create-check" className="rounded-xl border bg-white p-4">
         <div className="flex items-center justify-between">
           <div>
             <div className="text-sm font-medium">Create a check</div>
@@ -189,42 +273,135 @@ export default function MonitorClient({
 
       <section className="rounded-xl border bg-white p-4">
         <div className="text-sm font-medium">Checks</div>
-
-        <div className="mt-3 overflow-x-auto">
-          <table className="w-full text-sm">
+        {checks.length === 0 ? (
+          <div className="mt-3">
+            <EmptyState
+              title="No monitor checks yet"
+              description="Add an Uptime or SSL check to start tracking availability and certificate expiry."
+              actionLabel="Create a check"
+              actionHref="#create-check"
+            />
+          </div>
+        ) : (
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full text-sm">
             <thead className="text-left text-xs text-muted-foreground">
               <tr>
                 <th className="py-2">Type</th>
                 <th className="py-2">Target</th>
                 <th className="py-2">Interval</th>
+                <th className="py-2">Enabled</th>
                 <th className="py-2">Last status</th>
                 <th className="py-2">Last run</th>
+                <th className="py-2"></th>
               </tr>
             </thead>
             <tbody>
               {checks.map((c) => (
                 <tr key={c.id} className="border-t">
-                  <td className="py-2 font-mono">{c.type}</td>
                   <td className="py-2">
-                    <a className="underline" href={c.targetUrl} target="_blank" rel="noreferrer">
-                      {c.targetUrl}
-                    </a>
+                    <Badge variant="outline" className="font-mono">
+                      {c.type}
+                    </Badge>
                   </td>
-                  <td className="py-2">{c.intervalM}m</td>
-                  <td className="py-2 font-mono">{c.lastStatus ?? "-"}</td>
+                  <td className="py-2">
+                    {editingId === c.id ? (
+                      <input
+                        className="w-full rounded border p-2 text-sm"
+                        value={editTargetUrl}
+                        onChange={(e) => setEditTargetUrl(e.target.value)}
+                      />
+                    ) : (
+                      <a className="underline" href={c.targetUrl} target="_blank" rel="noreferrer">
+                        {c.targetUrl}
+                      </a>
+                    )}
+                  </td>
+                  <td className="py-2">
+                    {editingId === c.id ? (
+                      <input
+                        className="w-24 rounded border p-2 text-sm"
+                        type="number"
+                        min={1}
+                        max={1440}
+                        value={editIntervalM}
+                        onChange={(e) => setEditIntervalM(parseInt(e.target.value || "10", 10))}
+                      />
+                    ) : (
+                      `${c.intervalM}m`
+                    )}
+                  </td>
+                  <td className="py-2">
+                    <input
+                      type="checkbox"
+                      checked={!!c.enabled}
+                      disabled={busy}
+                      onChange={() => toggleEnabled(c)}
+                    />
+                  </td>
+                  <td className="py-2">
+                    {c.enabled ? null : (
+                      <Badge variant="muted" className="mr-2">Disabled</Badge>
+                    )}
+                    <Badge
+                      className="font-mono"
+                      variant={
+                        c.lastStatus === "OK"
+                          ? "success"
+                          : c.lastStatus === "WARN"
+                            ? "warning"
+                            : c.lastStatus === "FAIL"
+                              ? "danger"
+                              : "muted"
+                      }
+                    >
+                      {c.lastStatus ?? "-"}
+                    </Badge>
+                  </td>
                   <td className="py-2">{fmt(c.lastRunAt)}</td>
+                  <td className="py-2 text-right">
+                    {editingId === c.id ? (
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          className="rounded border px-2 py-1 text-xs hover:bg-muted disabled:opacity-60"
+                          disabled={busy}
+                          onClick={saveEdit}
+                        >
+                          Save
+                        </button>
+                        <button
+                          className="rounded border px-2 py-1 text-xs hover:bg-muted disabled:opacity-60"
+                          disabled={busy}
+                          onClick={() => setEditingId(null)}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          className="rounded border px-2 py-1 text-xs hover:bg-muted disabled:opacity-60"
+                          disabled={busy}
+                          onClick={() => startEdit(c)}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          className="rounded border px-2 py-1 text-xs hover:bg-muted disabled:opacity-60"
+                          disabled={busy}
+                          onClick={() => deleteCheck(c.id)}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    )}
+                  </td>
                 </tr>
               ))}
-              {checks.length === 0 ? (
-                <tr>
-                  <td className="py-3 text-muted-foreground" colSpan={5}>
-                    No checks yet.
-                  </td>
-                </tr>
-              ) : null}
             </tbody>
-          </table>
-        </div>
+            </table>
+          </div>
+        )}
 
         {checks.length > 0 ? (
           <div className="mt-4 grid gap-3 md:grid-cols-2">
@@ -246,7 +423,12 @@ export default function MonitorClient({
                           <span className="font-mono">{e.status}</span>
                           <span className="text-muted-foreground">{fmt(e.createdAt)}</span>
                         </div>
-                        <div className="mt-1 text-sm text-muted-foreground">{e.message}</div>
+                        <div className="mt-1 text-sm text-muted-foreground">
+                          {e.message}
+                          {extraEventInfo(e) ? (
+                            <span className="ml-2 font-mono text-xs">({extraEventInfo(e)})</span>
+                          ) : null}
+                        </div>
                       </div>
                     ))}
                     {ev.length === 0 ? <div className="text-sm text-muted-foreground">No events yet.</div> : null}
@@ -270,7 +452,10 @@ export default function MonitorClient({
                 </span>
                 <span className="text-muted-foreground">{fmt(e.createdAt)}</span>
               </div>
-              <div className="mt-1 text-sm text-muted-foreground">{e.message}</div>
+              <div className="mt-1 text-sm text-muted-foreground">
+                {e.message}
+                {extraEventInfo(e) ? <span className="ml-2 text-xs">({extraEventInfo(e)})</span> : null}
+              </div>
             </div>
           ))}
           {events.length === 0 ? <div className="text-sm text-muted-foreground">No events yet.</div> : null}

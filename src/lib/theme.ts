@@ -16,6 +16,7 @@ brandName?: string | null;
     title?: string | null;
     description?: string | null;
     ogImageUrl?: string | null;
+    faviconUrl?: string | null;
   } | null;
 
  pages?: {
@@ -44,6 +45,21 @@ brandName?: string | null;
     // cookies / analytics
     usesAnalytics?: boolean | null; // Google Analytics, etc
     analyticsProvider?: string | null; // "Google Analytics", "Plausible", etc
+    analyticsId?: string | null; // ej: GA4 Measurement ID (G-XXXX) o similar
+
+    // info legal
+    lastUpdated?: string | null; // ej: "2026-01-05" o "January 5, 2026"
+  } | null;
+
+  notifications?: {
+    ticketEmails?: string[] | null;
+    monitorEmails?: string[] | null;
+  } | null;
+
+  // ✅ NUEVO: navegación pública editable
+  navigation?: {
+    // links del header (desktop + mobile). href debe ser path relativo tipo "/", "/servicios", etc.
+    primary?: { label: string; href: string }[] | null;
   } | null;
 };
 export function sanitizeTheme(input: any) {
@@ -58,6 +74,8 @@ export function sanitizeTheme(input: any) {
     seo: t.seo ?? null,
     pages: t.pages ?? null,
 
+    navigation: t.navigation ?? null,
+
     // ✅ NUEVO
     legal: {
       companyName: t.legal?.companyName ?? null,
@@ -70,6 +88,9 @@ export function sanitizeTheme(input: any) {
       phone: t.legal?.phone ?? null,
       usesAnalytics: !!t.legal?.usesAnalytics,
       analyticsProvider: t.legal?.analyticsProvider ?? null,
+      analyticsId: t.legal?.analyticsId ?? null,
+
+      lastUpdated: t.legal?.lastUpdated ?? null,
     },
   };
 }
@@ -100,6 +121,7 @@ export const defaultTheme: TenantTheme = {
   seo: {
     title: "Web corporativa profesional",
     description: "Sitio rápido, SEO-ready y con base legal.",
+    faviconUrl: "",
   },
   legal: {
     companyName: "",
@@ -112,6 +134,23 @@ export const defaultTheme: TenantTheme = {
     phone: "",
     usesAnalytics: false,
     analyticsProvider: "Google Analytics",
+    analyticsId: "",
+
+    lastUpdated: "",
+  },
+
+  notifications: {
+    ticketEmails: [],
+    monitorEmails: [],
+  },
+
+  navigation: {
+    primary: [
+      { label: "Inicio", href: "/" },
+      { label: "Servicios", href: "/servicios" },
+      { label: "Sobre", href: "/sobre" },
+      { label: "Contacto", href: "/contacto" },
+    ],
   },
 };
 

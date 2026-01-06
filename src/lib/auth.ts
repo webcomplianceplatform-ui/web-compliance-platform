@@ -2,6 +2,7 @@ import type { NextAuthOptions } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
+import { rateLimit } from "@/lib/rate-limit";
 
 export const authOptions: NextAuthOptions = {
   session: { strategy: "jwt" },
@@ -12,10 +13,20 @@ export const authOptions: NextAuthOptions = {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
       },
-      async authorize(credentials) {
+      async authorize(credentials, req) {
         const email = credentials?.email?.toString().toLowerCase().trim();
         const password = credentials?.password?.toString() ?? "";
         if (!email || !password) return null;
+
+        const ip =
+          (req?.headers?.["x-forwarded-for"] as string | undefined)?.split(",")[0]?.trim() ||
+          (req?.headers?.["x-real-ip"] as string | undefined) ||
+          "unknown";
+
+        const rlIp = rateLimit({ key: `login:ip:${ip}`, limit: 30, windowMs: 60_000 });
+        if (!rlIp.ok) return null;
+        const rlEmail = rateLimit({ key: `login:email:${email}`, limit: 10, windowMs: 60_000 });
+        if (!rlEmail.ok) return null;
 
         const user = await prisma.user.findUnique({ where: { email } });
         if (!user?.passwordHash) return null;

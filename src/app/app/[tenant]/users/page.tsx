@@ -1,8 +1,7 @@
-import { redirect } from "next/navigation";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
-import { prisma } from "@/lib/db";
 import Link from "next/link";
+import { prisma } from "@/lib/db";
+import { requireTenantContextPage, canManageUsers } from "@/lib/tenant-auth";
+import UsersTableClient from "./UsersTableClient";
 
 export default async function UsersPage({
   params,
@@ -11,23 +10,10 @@ export default async function UsersPage({
 }) {
   const { tenant } = await params;
 
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.email) redirect("/login");
-
-  const user = await prisma.user.findUnique({
-    where: { email: session.user.email },
-    select: { id: true },
-  });
-  if (!user) redirect("/login");
-
-  const membership = await prisma.userTenant.findFirst({
-    where: { userId: user.id, tenant: { slug: tenant } },
-    select: { role: true },
-  });
-  if (!membership) redirect("/login");
+  const ctx = await requireTenantContextPage(tenant);
 
   const members = await prisma.userTenant.findMany({
-    where: { tenant: { slug: tenant } },
+    where: { tenantId: ctx.tenantId },
     select: {
       role: true,
       user: { select: { email: true, name: true, id: true } },
@@ -35,7 +21,7 @@ export default async function UsersPage({
     orderBy: { role: "asc" },
   });
 
-  const canManage = membership.role === "OWNER" || membership.role === "ADMIN";
+  const canManage = canManageUsers(ctx.role);
 
   return (
     <main>
@@ -51,31 +37,22 @@ export default async function UsersPage({
           </Link>
         ) : (
           <span className="text-sm text-muted-foreground">
-            Solo lectura ({membership.role})
+            Solo lectura ({ctx.role})
           </span>
         )}
       </div>
 
-      <div className="mt-4 overflow-hidden rounded border">
-        <table className="w-full text-sm">
-          <thead className="border-b bg-muted/50">
-            <tr>
-              <th className="p-3 text-left">Name</th>
-              <th className="p-3 text-left">Email</th>
-              <th className="p-3 text-left">Role</th>
-            </tr>
-          </thead>
-          <tbody>
-            {members.map((m) => (
-              <tr key={m.user.id} className="border-b last:border-b-0">
-                <td className="p-3">{m.user.name ?? "—"}</td>
-                <td className="p-3 font-mono">{m.user.email}</td>
-                <td className="p-3 font-mono">{m.role}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <UsersTableClient
+        tenant={tenant}
+        members={members.map((m) => ({
+          userId: m.user.id,
+          name: m.user.name,
+          email: m.user.email,
+          role: m.role,
+        }))}
+        myRole={ctx.role as any}
+        canManage={canManage}
+      />
     </main>
   );
 }

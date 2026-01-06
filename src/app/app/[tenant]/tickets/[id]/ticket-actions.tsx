@@ -7,17 +7,20 @@ export default function TicketActions({
   tenant,
   ticketId,
   canManage,
+  currentType,
   currentStatus,
   currentPriority,
 }: {
   tenant: string;
   ticketId: string;
   canManage: boolean;
+  currentType: string;
   currentStatus: string;
   currentPriority: string;
 }) {
   const router = useRouter();
   const [comment, setComment] = useState("");
+  const [type, setType] = useState(currentType);
   const [status, setStatus] = useState(currentStatus);
   const [priority, setPriority] = useState(currentPriority);
   const [msg, setMsg] = useState<string | null>(null);
@@ -28,6 +31,13 @@ export default function TicketActions({
 
       {canManage && (
         <div className="flex flex-wrap gap-2">
+          <select className="rounded border p-2 text-sm" value={type} onChange={(e) => setType(e.target.value)}>
+            <option value="CHANGE_REQUEST">CHANGE_REQUEST</option>
+            <option value="INCIDENT">INCIDENT</option>
+            <option value="LEGAL">LEGAL</option>
+            <option value="SEO">SEO</option>
+          </select>
+
           <select className="rounded border p-2 text-sm" value={status} onChange={(e) => setStatus(e.target.value)}>
             <option value="OPEN">OPEN</option>
             <option value="IN_PROGRESS">IN_PROGRESS</option>
@@ -50,7 +60,7 @@ export default function TicketActions({
               const res = await fetch(`/api/app/tickets/${ticketId}`, {
                 method: "PATCH",
                 headers: { "content-type": "application/json" },
-                body: JSON.stringify({ tenant, status, priority }),
+                body: JSON.stringify({ tenant, type, status, priority }),
               });
               const data = await res.json();
               setMsg(data.ok ? "Updated ✅" : `Error: ${data.error ?? "error"}`);

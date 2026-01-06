@@ -1,30 +1,37 @@
-import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireTenantContextApi } from "@/lib/tenant-auth";
+import { z } from "zod";
+import { parseJson, jsonOk, jsonError } from "@/lib/api-helpers";
+import { sendEmail } from "@/lib/mailer";
+import { ticketNotificationEmail } from "@/lib/email-templates/ticket";
+import { getTicketRecipientEmails } from "@/lib/notify";
+import { getClientIp } from "@/lib/ip";
+import { rateLimit } from "@/lib/rate-limit";
+import { auditLog } from "@/lib/audit";
 
-export async function POST(
-  req: Request,
-  { params }: { params: { id: string } }
-) {
-  const body = (await req.json()) as { tenant: string; body: string };
-  const { tenant, body: commentBody } = body ?? {};
+const AddCommentSchema = z.object({
+  tenant: z.string().min(1),
+  body: z.string().min(1).max(8000),
+});
 
-  if (!tenant || !commentBody) {
-    return NextResponse.json({ ok: false, error: "missing_fields" }, { status: 400 });
-  }
+export async function POST(req: Request, { params }: { params: { id: string } }) {
+  const ip = getClientIp(req);
+  const rl = rateLimit({ key: `tickets:comment:${ip}`, limit: 120, windowMs: 60_000 });
+  if (!rl.ok) return jsonError("rate_limited", 429, { retryAfterSec: rl.retryAfterSec });
+
+  const parsed = await parseJson(req, AddCommentSchema);
+  if (!parsed.ok) return parsed.res;
+  const { tenant, body: commentBody } = parsed.data;
 
   const auth = await requireTenantContextApi(tenant);
   if (!auth.ok) return auth.res;
   const { ctx } = auth;
 
-  // Asegura que el ticket pertenece al tenant
   const ticket = await prisma.ticket.findFirst({
-    where: { id: params.id, tenantId: ctx.tenantId },
+    where: { id: params.id, ctx.tenantId: ctx.ctx.tenantId },
     select: { id: true },
   });
-  if (!ticket) {
-    return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 });
-  }
+  if (!ticket) return jsonError("not_found", 404);
 
   await prisma.ticketComment.create({
     data: {
@@ -34,5 +41,13 @@ export async function POST(
     },
   });
 
-  return NextResponse.json({ ok: true });
+  await auditLog({
+    ctx.tenantId: ctx.ctx.tenantId,
+    actorUserId: ctx.user.id,
+    action: "ticket.comment.create",
+    targetType: "ticket",
+    targetId: params.id,
+  });
+
+  return jsonOk({});
 }

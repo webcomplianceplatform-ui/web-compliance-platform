@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "cross-env NEXT_DISABLE_TURBOPACK=1 next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
@@ -19,7 +19,8 @@
     "next-auth": "^4.24.13",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "tailwind-merge": "^3.4.0"
+    "tailwind-merge": "^3.4.0",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

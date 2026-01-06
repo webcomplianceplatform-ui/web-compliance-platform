@@ -1,6 +1,24 @@
 import Link from "next/link";
-import { PublicNav } from "@/components/public/PublicNav";
+import { PublicNav, type PublicNavItem } from "@/components/public/PublicNav";
 import { getPublicTenant } from "@/lib/public-tenant";
+import { defaultTheme } from "@/lib/theme";
+import CookieBanner from "@/components/public/CookieBanner";
+import AnalyticsLoader from "@/components/public/AnalyticsLoader";
+import type { Metadata } from "next";
+import { getBaseUrl } from "@/lib/seo";
+
+export async function generateMetadata({ params }: { params: Promise<{ tenant: string }> }): Promise<Metadata> {
+  const { tenant } = await params;
+  const data = await getPublicTenant(tenant);
+  if (!data) return {};
+
+  const favicon = (data.theme.seo as any)?.faviconUrl?.trim() || `${getBaseUrl()}/favicon.ico`;
+  return {
+    icons: {
+      icon: favicon,
+    },
+  };
+}
 
 function cssVarColor(value: string | null | undefined, fallback: string) {
   if (!value) return fallback;
@@ -24,6 +42,16 @@ export default async function TenantPublicLayout({
 
   const brandName = theme?.brandName ?? data?.tenant.name ?? tenant;
   const logoUrl = theme?.logoUrl ?? null;
+  const usesAnalytics = !!theme?.legal?.usesAnalytics;
+  const analyticsProvider = theme?.legal?.analyticsProvider ?? null;
+  const analyticsId = theme?.legal?.analyticsId ?? null;
+
+  const primaryLinks: PublicNavItem[] = (theme?.navigation?.primary ?? defaultTheme.navigation?.primary ?? []).map(
+    (x) => {
+      const path = x.href === "/" ? "" : x.href;
+      return { href: `/t/${tenant}${path}`, label: x.label };
+    }
+  );
 
   return (
     <div
@@ -58,29 +86,47 @@ export default async function TenantPublicLayout({
 
           {/* Desktop */}
           <nav className="hidden gap-4 text-sm md:flex">
-            <Link className="hover:underline" href={`/t/${tenant}/servicios`}>Servicios</Link>
-            <Link className="hover:underline" href={`/t/${tenant}/sobre`}>Sobre</Link>
-            <Link className="hover:underline" href={`/t/${tenant}/contacto`}>Contacto</Link>
+            {primaryLinks.map((it) => (
+              <Link key={it.href} className="hover:underline" href={it.href}>
+                {it.label}
+              </Link>
+            ))}
           </nav>
 
           {/* Mobile */}
-          <PublicNav tenant={tenant} />
+          <PublicNav items={primaryLinks} />
         </div>
       </header>
 
       <div className="mx-auto max-w-5xl p-6">{children}</div>
+
+      {/* Analítica (solo si hay consentimiento) */}
+      <AnalyticsLoader usesAnalytics={usesAnalytics} provider={analyticsProvider} analyticsId={analyticsId} />
+
       <footer className="mt-12 border-t py-8 text-sm text-muted-foreground">
-  <div className="mx-auto max-w-5xl px-6">
-    <div className="flex flex-wrap gap-4">
-      <Link className="hover:underline" href={`/t/${tenant}/aviso-legal`}>Aviso legal</Link>
-      <Link className="hover:underline" href={`/t/${tenant}/privacidad`}>Privacidad</Link>
-      <Link className="hover:underline" href={`/t/${tenant}/cookies`}>Cookies</Link>
-    </div>
-    <div className="mt-3 text-xs">
-      © {new Date().getFullYear()} {brandName}
-    </div>
-  </div>
-</footer>
+        <div className="mx-auto max-w-5xl px-6">
+          <div className="flex flex-wrap gap-4">
+            <Link className="hover:underline" href={`/t/${tenant}/legal/aviso-legal`}>
+              Aviso legal
+            </Link>
+            <Link className="hover:underline" href={`/t/${tenant}/legal/privacidad`}>
+              Privacidad
+            </Link>
+            <Link className="hover:underline" href={`/t/${tenant}/legal/cookies`}>
+              Cookies
+            </Link>
+            {usesAnalytics ? (
+              <Link className="hover:underline" href={`/t/${tenant}/legal/cookies?manage=1`}>
+                Preferencias de cookies
+              </Link>
+            ) : null}
+          </div>
+          <div className="mt-3 text-xs">© {new Date().getFullYear()} {brandName}</div>
+        </div>
+      </footer>
+
+      {/* Banner cookies (solo si aplica) */}
+      <CookieBanner tenant={tenant} usesAnalytics={usesAnalytics} />
 
     </div>
   );

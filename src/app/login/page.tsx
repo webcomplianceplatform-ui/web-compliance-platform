@@ -1,11 +1,14 @@
 "use client";
 
 import { signIn } from "next-auth/react";
+import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get("callbackUrl") || "/app";
 
   return (
     <main className="mx-auto max-w-sm p-6">
@@ -18,7 +21,7 @@ export default function LoginPage() {
           await signIn("credentials", {
             email,
             password,
-            callbackUrl: "/app/demo",
+            callbackUrl,
           });
         }}
       >
