@@ -19,6 +19,9 @@ function LoginInner() {
         className="mt-6 space-y-3"
         onSubmit={async (e) => {
           e.preventDefault();
+          const raw = searchParams.get("callbackUrl") || "/app";
+const callbackUrl = raw.startsWith("/") ? raw : "/app";
+
           await signIn("credentials", {
             email,
             password,
