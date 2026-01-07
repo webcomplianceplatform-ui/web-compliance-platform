@@ -54,7 +54,7 @@ export async function sendEmail(args: SendEmailArgs) {
         tenantId: args.tenantId,
         actorUserId: args.actorUserId ?? null,
         action: "email.skipped_no_provider",
-        targetType: "email",
+        targetType: "Email",
         targetId: null,
         meta: { to, subject: args.subject, tags: args.tags || {} },
       });
@@ -90,7 +90,7 @@ export async function sendEmail(args: SendEmailArgs) {
       tenantId: args.tenantId,
       actorUserId: args.actorUserId ?? null,
       action: "email.sent",
-      targetType: "email",
+      targetType: "Email",
       targetId: null,
       meta: { to, subject: args.subject, tags: args.tags || {} },
     });

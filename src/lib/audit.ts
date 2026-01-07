@@ -16,7 +16,7 @@ export async function auditLog(params: {
         action: params.action,
         targetType: params.targetType ?? null,
         targetId: params.targetId ?? null,
-        metaJson: params.meta ?? undefined,
+        meta: params.meta ?? undefined,
       },
     });
   } catch {

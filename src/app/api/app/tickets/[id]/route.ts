@@ -17,7 +17,9 @@ const UpdateTicketSchema = z.object({
   type: z.nativeEnum(TicketType).optional(),
 });
 
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+export async function PATCH(req: Request, ctx: any) {
+  const params = await ctx.params;
+
   const ip = getClientIp(req);
   const rl = rateLimit({ key: `tickets:update:${ip}`, limit: 60, windowMs: 60_000 });
   if (!rl.ok) return jsonError("rate_limited", 429, { retryAfterSec: rl.retryAfterSec });
@@ -36,7 +38,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
   const ticket = await prisma.ticket.findFirst({
     where: { id: params.id, tenantId: ctx.tenantId },
-    select: { id: true, title: true, status: true, priority: true, type: true },
+    select: { id: true, status: true, priority: true, type: true },
   });
   if (!ticket) return jsonError("not_found", 404);
 
@@ -94,7 +96,7 @@ try {
     const brand = (tenant?.themeJson as any)?.brandName || tenant?.name || "WebCompliance";
     const url = `${process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"}/app/${tenant?.slug || tenant}/tickets/${params.id}`;
     const message = `Ticket updated by ${ctx.user.email || "user"}:\n\n${changes.join("\n")}`;
-    const mail = ticketNotificationEmail({ brand, tenantSlug: tenant?.slug || tenant, ticketId: params.id, title: ticket.title, message, url });
+    const mail = ticketNotificationEmail({ brand, tenantSlug: tenant?.slug || tenant, ticketId: params.id, title: updated.title, message, url });
     const to = await getTicketRecipientEmails({ tenantId: ctx.tenantId, ticketId: params.id, exclude: [ctx.user.email || ""] });
     await sendEmail({ tenantId: ctx.tenantId, actorUserId: ctx.user.id, to, subject: mail.subject, text: mail.text, html: mail.html, tags: { kind: "ticket_update" } });
   }

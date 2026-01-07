@@ -171,9 +171,9 @@ export default async function TicketsPage({
           />
         </div>
       ) : (
-	        <>
-	          <div className="mt-4 overflow-hidden rounded border">
-	            <table className="w-full text-sm">
+      <>
+        <div className="mt-4 overflow-hidden rounded border">
+        <table className="w-full text-sm">
           <thead className="border-b bg-muted/50">
             <tr>
               <th className="p-3 text-left">Title</th>
@@ -235,8 +235,8 @@ export default async function TicketsPage({
               </tr>
             )}
           </tbody>
-	            </table>
-	          </div>
+        </table>
+      </div>
 
       <div className="mt-4 flex items-center justify-between">
         <Link
@@ -259,7 +259,7 @@ export default async function TicketsPage({
           Next →
         </Link>
       </div>
-	        </>
+      </>
       )}
     </main>
   );

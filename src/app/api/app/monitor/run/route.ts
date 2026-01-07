@@ -28,10 +28,7 @@ async function checkSsl(hostname: string, port: number) {
 export async function POST(req: Request) {
   const ip = getClientIp(req);
   const rl = rateLimit({ key: `monitor:run:${ip}`, limit: 10, windowMs: 60_000 });
-  if (!rl.ok) {
-    const retryAfterSec = rl.retryAfterSec;
-    return NextResponse.json({ ok: false, error: "rate_limited", retryAfterSec }, { status: 429 });
-  }
+  if (!rl.ok) return NextResponse.json({ ok: false, error: "rate_limited", retryAfterSec: rl.retryAfterSec }, { status: 429 });
 
   const body = (await req.json()) as { tenant?: string; force?: boolean };
   const tenantSlug = body?.tenant;
@@ -63,7 +60,7 @@ export async function POST(req: Request) {
     let status: "OK" | "WARN" | "FAIL" = "OK";
     let message = "OK";
     let severity = 1;
-    let metaJson: any = {};
+    let meta: any = {};
 
     try {
       if (c.type === "UPTIME") {
@@ -73,7 +70,7 @@ export async function POST(req: Request) {
         status = r.ok ? "OK" : "FAIL";
         message = `HTTP ${r.status}`;
         severity = r.ok ? 1 : 3;
-        metaJson = { httpStatus: r.status, latencyMs };
+        meta = { httpStatus: r.status, latencyMs };
       } else {
         const url = new URL(c.targetUrl);
         const port = url.port ? parseInt(url.port, 10) : 443;
@@ -93,7 +90,7 @@ export async function POST(req: Request) {
           severity = 1;
         }
 
-        metaJson = { ...ssl, hostname: url.hostname, port };
+        meta = { ...ssl, hostname: url.hostname, port };
       }
     } catch (e: any) {
       status = "FAIL";
@@ -108,7 +105,7 @@ export async function POST(req: Request) {
         status,
         severity,
         message,
-        metaJson,
+        meta,
       },
     });
 
@@ -119,8 +116,8 @@ try {
   const isDown = severity >= 3 || status === "FAIL";
   const isSslExpiring =
     c.type === "SSL" &&
-    typeof (metaJson as any)?.daysLeft === "number" &&
-    (metaJson as any).daysLeft <= daysThreshold;
+    typeof (meta as any)?.daysLeft === "number" &&
+    (meta as any).daysLeft <= daysThreshold;
 
   if (isDown || isSslExpiring) {
     const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { slug: true, name: true, themeJson: true } });

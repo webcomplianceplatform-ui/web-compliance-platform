@@ -40,7 +40,7 @@ async function runChecksForTenant(tenantId: string) {
     let status: "OK" | "WARN" | "FAIL" = "OK";
     let message = "OK";
     let severity = 1;
-    let metaJson: any = {};
+    let meta: any = {};
 
     try {
       if (c.type === "UPTIME") {
@@ -50,7 +50,7 @@ async function runChecksForTenant(tenantId: string) {
         status = r.ok ? "OK" : "FAIL";
         message = `HTTP ${r.status}`;
         severity = r.ok ? 1 : 3;
-        metaJson = { httpStatus: r.status, latencyMs };
+        meta = { httpStatus: r.status, latencyMs };
       } else {
         const url = new URL(c.targetUrl);
         const port = url.port ? parseInt(url.port, 10) : 443;
@@ -70,7 +70,7 @@ async function runChecksForTenant(tenantId: string) {
           severity = 1;
         }
 
-        metaJson = { ...ssl, hostname: url.hostname, port };
+        meta = { ...ssl, hostname: url.hostname, port };
       }
     } catch (e: any) {
       status = "FAIL";
@@ -79,7 +79,7 @@ async function runChecksForTenant(tenantId: string) {
     }
 
     await prisma.monitorEvent.create({
-      data: { tenantId, checkId: c.id, status, severity, message, metaJson },
+      data: { tenantId, checkId: c.id, status, severity, message, meta },
     });
 
     await prisma.monitorCheck.update({

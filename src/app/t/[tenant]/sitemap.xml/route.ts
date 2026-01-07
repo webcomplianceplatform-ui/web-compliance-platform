@@ -6,7 +6,9 @@ function xmlEscape(s: string) {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-export async function GET(_req: Request, { params }: { params: Promise<{ tenant: string }> }) {
+export async function GET(_req: Request, ctx: any) {
+  const params = await ctx.params;
+
   const { tenant } = await params;
   const data = await getPublicTenant(tenant);
   if (!data) return new NextResponse("Not found", { status: 404 });

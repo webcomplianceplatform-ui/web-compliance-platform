@@ -10,8 +10,6 @@ import { auditLog } from "@/lib/audit";
 import { sendEmail, getTenantNotificationEmails, getTenantOwnerAdminEmails } from "@/lib/mailer";
 import { inviteEmail } from "@/lib/email-templates/invite";
 
-type RouteCtx = { params: Promise<{ tenant: string }> };
-
 function normalizeRole(role: unknown): UserRole | null {
   if (role === "OWNER") return UserRole.OWNER;
   if (role === "ADMIN") return UserRole.ADMIN;
@@ -24,10 +22,10 @@ async function ownersCount(tenantId: string) {
   return prisma.userTenant.count({ where: { tenantId, role: UserRole.OWNER } });
 }
 
-export async function GET(_req: Request, ctx: RouteCtx) {
-  const { tenant } = await ctx.params;
+export async function GET(_req: Request, ctx: any) {
+  const params = await ctx.params;
 
-  const ctxRes = await requireTenantContextApi(tenant);
+  const ctxRes = await requireTenantContextApi(params.tenant);
   if (!ctxRes.ok) return ctxRes.res;
 
   const { tenantId, role } = ctxRes.ctx;
@@ -59,14 +57,14 @@ const AddUserSchema = z.object({
   role: z.enum(["OWNER", "ADMIN", "CLIENT", "VIEWER"]),
 });
 
-export async function POST(req: Request, ctx: RouteCtx) {
-  const { tenant } = await ctx.params;
+export async function POST(req: Request, ctx: any) {
+  const params = await ctx.params;
 
   const ip = getClientIp(req);
   const rl = rateLimit({ key: `users:add:${ip}`, limit: 20, windowMs: 60_000 });
   if (!rl.ok) return jsonError("rate_limited", 429, { retryAfterSec: rl.retryAfterSec });
 
-  const ctxRes = await requireTenantContextApi(tenant);
+  const ctxRes = await requireTenantContextApi(params.tenant);
   if (!ctxRes.ok) return ctxRes.res;
 
   const { tenantId, role: myRole, user: me } = ctxRes.ctx;
@@ -125,26 +123,17 @@ export async function POST(req: Request, ctx: RouteCtx) {
     meta: { role: wantedRole, email },
   });
 
+  
   // Email invite (best-effort)
   try {
-    const tenantRec = await prisma.tenant.findUnique({
-      where: { id: tenantId },
-      select: { slug: true, name: true, themeJson: true },
-    });
-
-    const brand = (tenantRec?.themeJson as any)?.brandName || tenantRec?.name || "WebCompliance";
+    const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { slug: true, name: true, themeJson: true } });
+    const brand = (tenant?.themeJson as any)?.brandName || tenant?.name || "WebCompliance";
     const loginUrl = `${process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"}/login`;
-
-    const mail = inviteEmail({
-      brand,
-      tenantSlug: tenantRec?.slug || tenant,
-      tempPassword: !existingUser ? tempPassword : null,
-      loginUrl,
-    });
+    const mail = inviteEmail({ brand, tenantSlug: tenant?.slug || params.tenant, tempPassword: !existingUser ? tempPassword : null, loginUrl });
 
     const notif = await getTenantNotificationEmails(tenantId);
     const fallbackAdmins = await getTenantOwnerAdminEmails(tenantId);
-    const to = notif.ticketEmails?.length ? notif.ticketEmails : fallbackAdmins;
+    const to = (notif.ticketEmails?.length ? notif.ticketEmails : fallbackAdmins);
 
     await sendEmail({
       tenantId,
@@ -167,14 +156,14 @@ const UpdateRoleSchema = z.object({
   role: z.enum(["OWNER", "ADMIN", "CLIENT", "VIEWER"]),
 });
 
-export async function PATCH(req: Request, ctx: RouteCtx) {
-  const { tenant } = await ctx.params;
+export async function PATCH(req: Request, ctx: any) {
+  const params = await ctx.params;
 
   const ip = getClientIp(req);
   const rl = rateLimit({ key: `users:update:${ip}`, limit: 60, windowMs: 60_000 });
   if (!rl.ok) return jsonError("rate_limited", 429, { retryAfterSec: rl.retryAfterSec });
 
-  const ctxRes = await requireTenantContextApi(tenant);
+  const ctxRes = await requireTenantContextApi(params.tenant);
   if (!ctxRes.ok) return ctxRes.res;
 
   const { user: me, tenantId, role: myRole } = ctxRes.ctx;
@@ -231,14 +220,14 @@ const RemoveUserSchema = z.object({
   userId: z.string().min(1),
 });
 
-export async function DELETE(req: Request, ctx: RouteCtx) {
-  const { tenant } = await ctx.params;
+export async function DELETE(req: Request, ctx: any) {
+  const params = await ctx.params;
 
   const ip = getClientIp(req);
   const rl = rateLimit({ key: `users:remove:${ip}`, limit: 60, windowMs: 60_000 });
   if (!rl.ok) return jsonError("rate_limited", 429, { retryAfterSec: rl.retryAfterSec });
 
-  const ctxRes = await requireTenantContextApi(tenant);
+  const ctxRes = await requireTenantContextApi(params.tenant);
   if (!ctxRes.ok) return ctxRes.res;
 
   const { user: me, tenantId, role: myRole } = ctxRes.ctx;

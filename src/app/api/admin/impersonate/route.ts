@@ -9,6 +9,7 @@ import { auditLog } from "@/lib/audit";
 const IMPERSONATE_COOKIE = "wc_impersonate_tenant";
 
 export async function POST(req: Request) {
+  const cookieStore = await cookies();
   const session = await getServerSession(authOptions);
   const email = session?.user?.email ?? null;
   if (!email || !isSuperadminEmail(email)) {
@@ -29,7 +30,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 });
   }
 
-  const cookieStore = await cookies();
   cookieStore.set({
     name: IMPERSONATE_COOKIE,
     value: tenantSlug,

@@ -19,7 +19,7 @@ export async function GET(req: Request) {
       status: true,
       severity: true,
       message: true,
-      metaJson: true,
+      meta: true,
       createdAt: true,
       checkId: true,
     },

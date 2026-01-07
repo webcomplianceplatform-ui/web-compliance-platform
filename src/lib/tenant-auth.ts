@@ -11,6 +11,8 @@ const IMPERSONATE_COOKIE = "wc_impersonate_tenant";
 
 /** ✅ Para PAGES/LAYOUTS (puede hacer redirect) */
 export async function requireTenantContextPage(tenantSlug: string) {
+  const cookieStore = await cookies();
+
   const session = await getServerSession(authOptions);
   if (!session?.user?.email) redirect("/login");
 
@@ -28,7 +30,6 @@ export async function requireTenantContextPage(tenantSlug: string) {
   // ✅ Clean impersonation: superadmin can access a tenant ONLY if an explicit cookie is set.
   if (!membership) {
     const email = session.user.email;
-    const cookieStore = await cookies();
     const cookieTenant = cookieStore.get(IMPERSONATE_COOKIE)?.value ?? null;
     if (isSuperadminEmail(email) && cookieTenant && cookieTenant === tenantSlug) {
       const tenant = await prisma.tenant.findUnique({
@@ -57,6 +58,8 @@ export async function requireTenantContextPage(tenantSlug: string) {
 
 /** ✅ Para API (NUNCA redirect; devuelve errores JSON) */
 export async function requireTenantContextApi(tenantSlug: string) {
+  const cookieStore = await cookies();
+
   const session = await getServerSession(authOptions);
   if (!session?.user?.email) {
     return { ok: false as const, res: NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 }) };
@@ -77,7 +80,6 @@ export async function requireTenantContextApi(tenantSlug: string) {
 
   if (!membership) {
     const email = session.user.email;
-    const cookieStore = await cookies();
     const cookieTenant = cookieStore.get(IMPERSONATE_COOKIE)?.value ?? null;
     if (isSuperadminEmail(email) && cookieTenant && cookieTenant === tenantSlug) {
       const tenant = await prisma.tenant.findUnique({
@@ -108,8 +110,8 @@ export async function requireTenantContextApi(tenantSlug: string) {
 export function canManageTickets(role: UserRole) {
   return role === UserRole.OWNER || role === UserRole.ADMIN;
 }
-export function canManageSettings(role: UserRole) {
-  return role === UserRole.OWNER || role === UserRole.ADMIN;
+export function canManageSettings(role: string) {
+  return role === "OWNER" || role === "ADMIN";
 }
 
 export function canManageUsers(role: UserRole) {

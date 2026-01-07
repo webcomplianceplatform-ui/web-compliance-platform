@@ -14,9 +14,9 @@ const DAYS_7_MS = 7 * 24 * 60 * 60 * 1000;
 export default async function TenantHome({
   params,
 }: {
-  params: { tenant: string };
+  params: Promise<{ tenant: string }>;
 }) {
-  const { tenant } = params;
+  const { tenant } = await params;
 
   const ctx = await requireTenantContextPage(tenant);
   const isTicketManager = canManageTickets(ctx.role);
