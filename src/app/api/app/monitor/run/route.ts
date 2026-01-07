@@ -29,7 +29,10 @@ export async function POST(req: Request) {
   const ip = getClientIp(req);
   const rl = rateLimit({ key: `monitor:run:${ip}`, limit: 10, windowMs: 60_000 });
   if (rl.ok === false) {
-    return NextResponse.json({ ok: false, error: "rate_limited", retryAfterSec: rl.retryAfterSec }, { status: 429 });
+    return NextResponse.json(
+      { ok: false, error: "rate_limited", retryAfterSec: rl.retryAfterSec },
+      { status: 429 }
+    );
   }
 
   const body = (await req.json()) as { tenant?: string; force?: boolean };
@@ -42,7 +45,9 @@ export async function POST(req: Request) {
   }
   const { tenantId } = auth.ctx;
 
-  if (!canManageSettings(auth.ctx.role)) return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
+  if (!canManageSettings(auth.ctx.role)) {
+    return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
+  }
 
   const force = Boolean(body?.force);
 
@@ -80,7 +85,7 @@ export async function POST(req: Request) {
         const port = url.port ? parseInt(url.port, 10) : 443;
         const ssl = await checkSsl(url.hostname, Number.isFinite(port) ? port : 443);
 
-        if (ssl.ok === false) {
+        if (!ssl.ok) {
           status = "FAIL";
           message = `SSL FAIL: ${ssl.error ?? "unknown"}`;
           severity = 3;
@@ -102,14 +107,14 @@ export async function POST(req: Request) {
       severity = 3;
     }
 
-    const ev = await prisma.monitorEvent.create({
+    await prisma.monitorEvent.create({
       data: {
         tenantId,
         checkId: c.id,
         status,
         severity,
         message,
-        meta,
+        metaJson: meta, // ✅ FIX
       },
     });
 
@@ -144,7 +149,7 @@ try {
   console.error("monitor alert email failed", e);
 }
 
-    await prisma.monitorCheck.update({
+     await prisma.monitorCheck.update({
       where: { id: c.id },
       data: { lastStatus: status, lastRunAt: new Date() },
     });
@@ -156,7 +161,7 @@ try {
     action: "monitor.run",
     targetType: "tenant",
     targetId: tenantId,
-    meta: { checks: due.length, force },
+    metaJson: { checks: due.length, force },
   });
 
   return NextResponse.json({ ok: true, checked: due.length, skipped: checks.length - due.length });
