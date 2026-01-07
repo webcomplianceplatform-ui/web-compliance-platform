@@ -7,11 +7,11 @@ type Bucket = {
 // In serverless this is per-instance, but it's still useful for basic abuse prevention.
 const buckets = new Map<string, Bucket>();
 
-export function rateLimit(opts: {
-  key: string;
-  limit: number;
-  windowMs: number;
-}): { ok: true } | { ok: false; retryAfterSec: number } {
+export type RateLimitOk = { ok: true };
+export type RateLimitBlocked = { ok: false; retryAfterSec: number };
+export type RateLimitResult = RateLimitOk | RateLimitBlocked;
+
+export function rateLimit(opts: { key: string; limit: number; windowMs: number }): RateLimitResult {
   const now = Date.now();
   const b = buckets.get(opts.key);
 
