@@ -28,7 +28,8 @@ export async function requireTenantContextPage(tenantSlug: string) {
   // ✅ Clean impersonation: superadmin can access a tenant ONLY if an explicit cookie is set.
   if (!membership) {
     const email = session.user.email;
-    const cookieTenant = cookies().get(IMPERSONATE_COOKIE)?.value ?? null;
+    const cookieStore = await cookies();
+    const cookieTenant = cookieStore.get(IMPERSONATE_COOKIE)?.value ?? null;
     if (isSuperadminEmail(email) && cookieTenant && cookieTenant === tenantSlug) {
       const tenant = await prisma.tenant.findUnique({
         where: { slug: tenantSlug },
@@ -76,7 +77,8 @@ export async function requireTenantContextApi(tenantSlug: string) {
 
   if (!membership) {
     const email = session.user.email;
-    const cookieTenant = cookies().get(IMPERSONATE_COOKIE)?.value ?? null;
+    const cookieStore = await cookies();
+    const cookieTenant = cookieStore.get(IMPERSONATE_COOKIE)?.value ?? null;
     if (isSuperadminEmail(email) && cookieTenant && cookieTenant === tenantSlug) {
       const tenant = await prisma.tenant.findUnique({
         where: { slug: tenantSlug },
@@ -106,8 +108,8 @@ export async function requireTenantContextApi(tenantSlug: string) {
 export function canManageTickets(role: UserRole) {
   return role === UserRole.OWNER || role === UserRole.ADMIN;
 }
-export function canManageSettings(role: string) {
-  return role === "OWNER" || role === "ADMIN";
+export function canManageSettings(role: UserRole) {
+  return role === UserRole.OWNER || role === UserRole.ADMIN;
 }
 
 export function canManageUsers(role: UserRole) {

@@ -28,7 +28,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   const { ctx } = auth;
 
   const ticket = await prisma.ticket.findFirst({
-    where: { id: params.id, ctx.tenantId: ctx.ctx.tenantId },
+    // Ensure ticket belongs to the current tenant
+    where: { id: params.id, tenantId: ctx.tenantId },
     select: { id: true },
   });
   if (!ticket) return jsonError("not_found", 404);
@@ -42,7 +43,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   });
 
   await auditLog({
-    ctx.tenantId: ctx.ctx.tenantId,
+    tenantId: ctx.tenantId,
     actorUserId: ctx.user.id,
     action: "ticket.comment.create",
     targetType: "ticket",

@@ -116,7 +116,7 @@ export async function PATCH(req: Request) {
     action: "monitor.check.update",
     targetType: "monitorCheck",
     targetId: id,
-    metaJson: { targetUrl, intervalM, enabled },
+    meta: { targetUrl, intervalM, enabled },
   });
 
   return jsonOk({ ok: true });

@@ -54,8 +54,8 @@ export async function sendEmail(args: SendEmailArgs) {
         tenantId: args.tenantId,
         actorUserId: args.actorUserId ?? null,
         action: "email.skipped_no_provider",
-        entityType: "Email",
-        entityId: null,
+        targetType: "email",
+        targetId: null,
         meta: { to, subject: args.subject, tags: args.tags || {} },
       });
     }
@@ -90,8 +90,8 @@ export async function sendEmail(args: SendEmailArgs) {
       tenantId: args.tenantId,
       actorUserId: args.actorUserId ?? null,
       action: "email.sent",
-      entityType: "Email",
-      entityId: null,
+      targetType: "email",
+      targetId: null,
       meta: { to, subject: args.subject, tags: args.tags || {} },
     });
   }

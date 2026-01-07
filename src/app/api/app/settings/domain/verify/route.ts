@@ -71,7 +71,7 @@ export async function POST(req: Request) {
     action: "tenant.domain.verify",
     targetType: "tenant",
     targetId: auth.ctx.tenantId,
-    metaJson: ({ customDomain: domain } as any),
+    meta: ({ customDomain: domain } as any),
   });
 
   return jsonOk({ customDomainVerifiedAt: verifiedAt });

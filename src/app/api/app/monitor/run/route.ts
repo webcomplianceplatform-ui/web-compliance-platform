@@ -28,7 +28,10 @@ async function checkSsl(hostname: string, port: number) {
 export async function POST(req: Request) {
   const ip = getClientIp(req);
   const rl = rateLimit({ key: `monitor:run:${ip}`, limit: 10, windowMs: 60_000 });
-  if (!rl.ok) return NextResponse.json({ ok: false, error: "rate_limited", retryAfterSec: rl.retryAfterSec }, { status: 429 });
+  if (!rl.ok) {
+    const retryAfterSec = rl.retryAfterSec;
+    return NextResponse.json({ ok: false, error: "rate_limited", retryAfterSec }, { status: 429 });
+  }
 
   const body = (await req.json()) as { tenant?: string; force?: boolean };
   const tenantSlug = body?.tenant;
@@ -152,7 +155,7 @@ try {
     action: "monitor.run",
     targetType: "tenant",
     targetId: tenantId,
-    metaJson: { checks: due.length, force },
+    meta: { checks: due.length, force },
   });
 
   return NextResponse.json({ ok: true, checked: due.length, skipped: checks.length - due.length });

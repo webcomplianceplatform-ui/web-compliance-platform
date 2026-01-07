@@ -83,7 +83,7 @@ export async function POST(req: Request) {
     action: "tenant.domain.update",
     targetType: "tenant",
     targetId: auth.ctx.tenantId,
-    metaJson: normalized ? ({ customDomain: normalized } as any) : undefined,
+    meta: normalized ? ({ customDomain: normalized } as any) : undefined,
   });
 
   return jsonOk({ customDomain: normalized, customDomainVerifiedAt: null });

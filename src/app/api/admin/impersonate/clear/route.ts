@@ -15,8 +15,9 @@ export async function POST() {
     return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
   }
 
-  const current = cookies().get(IMPERSONATE_COOKIE)?.value ?? null;
-  cookies().set({
+  const cookieStore = await cookies();
+  const current = cookieStore.get(IMPERSONATE_COOKIE)?.value ?? null;
+  cookieStore.set({
     name: IMPERSONATE_COOKIE,
     value: "",
     httpOnly: true,

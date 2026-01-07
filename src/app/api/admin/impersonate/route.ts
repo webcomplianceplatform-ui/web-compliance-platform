@@ -29,7 +29,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 });
   }
 
-  cookies().set({
+  const cookieStore = await cookies();
+  cookieStore.set({
     name: IMPERSONATE_COOKIE,
     value: tenantSlug,
     httpOnly: true,
