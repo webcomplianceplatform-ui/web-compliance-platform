@@ -23,13 +23,14 @@ async function ownersCount(tenantId: string) {
 }
 
 export async function GET(_req: Request, ctx: any) {
-  const params = await ctx.params;
+  const params = await routeCtx.params;
 
   const ctxRes = await requireTenantContextApi(params.tenant);
-  if (!ctxRes.ok) {
+  if (ctxRes.ok === false) {
     return ctxRes.res;
   }
-const { tenantId, role } = ctxRes.ctx;
+
+  const { tenantId, role } = ctxRes.ctx;
 
   const members = await prisma.userTenant.findMany({
     where: { tenantId },
@@ -58,26 +59,29 @@ const AddUserSchema = z.object({
   role: z.enum(["OWNER", "ADMIN", "CLIENT", "VIEWER"]),
 });
 
-export async function POST(req: Request, ctx: any) {
-  const params = await ctx.params;
+export async function POST(req: Request, routeCtx: any) {
+  const params = await routeCtx.params;
 
   const ip = getClientIp(req);
   const rl = rateLimit({ key: `users:add:${ip}`, limit: 20, windowMs: 60_000 });
-  if (!rl.ok) {
+  if (rl.ok === false) {
     return jsonError("rate_limited", 429, { retryAfterSec: rl.retryAfterSec });
   }
-const ctxRes = await requireTenantContextApi(params.tenant);
-  if (!ctxRes.ok) {
+
+  const ctxRes = await requireTenantContextApi(params.tenant);
+  if (ctxRes.ok === false) {
     return ctxRes.res;
   }
-const { tenantId, role: myRole, user: me } = ctxRes.ctx;
+
+  const { tenantId, role: myRole, user: me } = ctxRes.ctx;
   if (!canManageUsers(myRole)) return jsonError("forbidden", 403);
 
   const parsed = await parseJson(req, AddUserSchema);
-  if (!parsed.ok) {
+  if (parsed.ok === false) {
     return parsed.res;
   }
-const email = parsed.data.email;
+
+  const email = parsed.data.email;
   const name = parsed.data.name?.trim() || null;
   const wantedRole = normalizeRole(parsed.data.role);
   if (!wantedRole) return jsonError("invalid_input", 400);
@@ -160,26 +164,29 @@ const UpdateRoleSchema = z.object({
   role: z.enum(["OWNER", "ADMIN", "CLIENT", "VIEWER"]),
 });
 
-export async function PATCH(req: Request, ctx: any) {
-  const params = await ctx.params;
+export async function PATCH(req: Request, routeCtx: any) {
+  const params = await routeCtx.params;
 
   const ip = getClientIp(req);
   const rl = rateLimit({ key: `users:update:${ip}`, limit: 60, windowMs: 60_000 });
-  if (!rl.ok) {
+  if (rl.ok === false) {
     return jsonError("rate_limited", 429, { retryAfterSec: rl.retryAfterSec });
   }
-const ctxRes = await requireTenantContextApi(params.tenant);
-  if (!ctxRes.ok) {
+
+  const ctxRes = await requireTenantContextApi(params.tenant);
+  if (ctxRes.ok === false) {
     return ctxRes.res;
   }
-const { user: me, tenantId, role: myRole } = ctxRes.ctx;
+
+  const { user: me, tenantId, role: myRole } = ctxRes.ctx;
   if (!canManageUsers(myRole)) return jsonError("forbidden", 403);
 
   const parsed = await parseJson(req, UpdateRoleSchema);
-  if (!parsed.ok) {
+  if (parsed.ok === false) {
     return parsed.res;
   }
-const targetUserId = parsed.data.userId;
+
+  const targetUserId = parsed.data.userId;
   const newRole = normalizeRole(parsed.data.role);
   if (!newRole) return jsonError("invalid_input", 400);
 
@@ -227,26 +234,29 @@ const RemoveUserSchema = z.object({
   userId: z.string().min(1),
 });
 
-export async function DELETE(req: Request, ctx: any) {
-  const params = await ctx.params;
+export async function DELETE(req: Request, routeCtx: any) {
+  const params = await routeCtx.params;
 
   const ip = getClientIp(req);
   const rl = rateLimit({ key: `users:remove:${ip}`, limit: 60, windowMs: 60_000 });
-  if (!rl.ok) {
+  if (rl.ok === false) {
     return jsonError("rate_limited", 429, { retryAfterSec: rl.retryAfterSec });
   }
-const ctxRes = await requireTenantContextApi(params.tenant);
-  if (!ctxRes.ok) {
+
+  const ctxRes = await requireTenantContextApi(params.tenant);
+  if (ctxRes.ok === false) {
     return ctxRes.res;
   }
-const { user: me, tenantId, role: myRole } = ctxRes.ctx;
+
+  const { user: me, tenantId, role: myRole } = ctxRes.ctx;
   if (!canManageUsers(myRole)) return jsonError("forbidden", 403);
 
   const parsed = await parseJson(req, RemoveUserSchema);
-  if (!parsed.ok) {
+  if (parsed.ok === false) {
     return parsed.res;
   }
-const targetUserId = parsed.data.userId;
+
+  const targetUserId = parsed.data.userId;
 
   const membership = await prisma.userTenant.findUnique({
     where: { userId_tenantId: { userId: targetUserId, tenantId } },

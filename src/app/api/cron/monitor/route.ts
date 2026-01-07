@@ -56,7 +56,7 @@ async function runChecksForTenant(tenantId: string) {
         const port = url.port ? parseInt(url.port, 10) : 443;
         const ssl = await checkSsl(url.hostname, Number.isFinite(port) ? port : 443);
 
-        if (!ssl.ok) {
+        if (ssl.ok === false) {
           status = "FAIL";
           message = `SSL FAIL: ${ssl.error ?? "unknown"}`;
           severity = 3;

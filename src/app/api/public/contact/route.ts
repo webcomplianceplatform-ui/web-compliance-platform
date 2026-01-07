@@ -24,14 +24,16 @@ async function getOrCreateSystemUserId() {
 export async function POST(req: Request) {
   const ip = getClientIp(req);
   const rl = rateLimit({ key: `public:contact:${ip}`, limit: 10, windowMs: 60_000 });
-  if (!rl.ok) {
+  if (rl.ok === false) {
     return jsonError("rate_limited", 429, { retryAfterSec: rl.retryAfterSec });
   }
-const parsed = await parseJson(req, ContactSchema);
-  if (!parsed.ok) {
+
+  const parsed = await parseJson(req, ContactSchema);
+  if (parsed.ok === false) {
     return parsed.res;
   }
-const { tenant, name, email, message } = parsed.data;
+
+  const { tenant, name, email, message } = parsed.data;
 
   const t = await prisma.tenant.findUnique({ where: { slug: tenant }, select: { id: true } });
   if (!t) return jsonError("tenant_not_found", 404);

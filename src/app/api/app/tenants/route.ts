@@ -58,10 +58,11 @@ const CreateTenantSchema = z.object({
 export async function POST(req: Request) {
   const ip = getClientIp(req);
   const rl = rateLimit({ key: `tenants:create:${ip}`, limit: 10, windowMs: 60_000 });
-  if (!rl.ok) {
+  if (rl.ok === false) {
     return jsonError("rate_limited", 429, { retryAfterSec: rl.retryAfterSec });
   }
-const session = await getServerSession(authOptions);
+
+  const session = await getServerSession(authOptions);
   if (!session?.user?.email) return jsonError("unauthorized", 401);
 
   const user = await prisma.user.findUnique({
@@ -71,10 +72,11 @@ const session = await getServerSession(authOptions);
   if (!user) return jsonError("unauthorized", 401);
 
   const parsed = await parseJson(req, CreateTenantSchema);
-  if (!parsed.ok) {
+  if (parsed.ok === false) {
     return parsed.res;
   }
-const slug = normalizeSlug(parsed.data.slug);
+
+  const slug = normalizeSlug(parsed.data.slug);
   const name = parsed.data.name.trim();
 
   if (!isValidSlug(slug) || RESERVED.has(slug)) return jsonError("invalid_slug", 400);

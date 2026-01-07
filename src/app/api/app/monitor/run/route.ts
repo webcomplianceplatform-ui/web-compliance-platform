@@ -28,17 +28,19 @@ async function checkSsl(hostname: string, port: number) {
 export async function POST(req: Request) {
   const ip = getClientIp(req);
   const rl = rateLimit({ key: `monitor:run:${ip}`, limit: 10, windowMs: 60_000 });
-  if (!rl.ok) return NextResponse.json({ ok: false, error: "rate_limited", retryAfterSec: rl.retryAfterSec }, { status: 429 });
+  if (rl.ok === false) {
+    return NextResponse.json({ ok: false, error: "rate_limited", retryAfterSec: rl.retryAfterSec }, { status: 429 });
+  }
 
   const body = (await req.json()) as { tenant?: string; force?: boolean };
   const tenantSlug = body?.tenant;
   if (!tenantSlug) return NextResponse.json({ ok: false, error: "missing_tenant" }, { status: 400 });
 
   const auth = await requireTenantContextApi(tenantSlug);
-  if (!auth.ok) {
+  if (auth.ok === false) {
     return auth.res;
   }
-const { tenantId } = auth.ctx;
+  const { tenantId } = auth.ctx;
 
   if (!canManageSettings(auth.ctx.role)) return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
 
@@ -78,7 +80,7 @@ const { tenantId } = auth.ctx;
         const port = url.port ? parseInt(url.port, 10) : 443;
         const ssl = await checkSsl(url.hostname, Number.isFinite(port) ? port : 443);
 
-        if (!ssl.ok) {
+        if (ssl.ok === false) {
           status = "FAIL";
           message = `SSL FAIL: ${ssl.error ?? "unknown"}`;
           severity = 3;

@@ -7,7 +7,7 @@ function xmlEscape(s: string) {
 }
 
 export async function GET(_req: Request, ctx: any) {
-  const params = await ctx.params;
+  const params = await routeCtx.params;
 
   const { tenant } = await params;
   const data = await getPublicTenant(tenant);

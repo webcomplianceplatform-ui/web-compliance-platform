@@ -19,7 +19,6 @@ export default function InviteClient({ tenantSlug }: { tenantSlug: string }) {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
         />
-
         <input
           className="w-full rounded border p-2"
           placeholder="name (optional)"
@@ -41,20 +40,16 @@ export default function InviteClient({ tenantSlug }: { tenantSlug: string }) {
           className="rounded bg-black px-3 py-2 text-white"
           onClick={async () => {
             setResult(null);
-
             const res = await fetch(`/api/app/tenants/${tenantSlug}/users`, {
               method: "POST",
               headers: { "content-type": "application/json" },
               body: JSON.stringify({ email, name, role }),
             });
-
             const data = await res.json();
-
             if (!data.ok) {
               setResult("Error: " + (data.error ?? res.status));
               return;
             }
-
             if (data.tempPassword) {
               setResult("User created. Temp password: " + data.tempPassword);
             } else {
