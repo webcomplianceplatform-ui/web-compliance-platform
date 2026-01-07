@@ -14,8 +14,8 @@ const AddCommentSchema = z.object({
   body: z.string().min(1).max(8000),
 });
 
-export async function POST(req: Request, ctx: any) {
-  const params = await ctx.params;
+export async function POST(req: Request, routeCtx: any) {
+  const params = await routeCtx.params;
 
   const ip = getClientIp(req);
   const rl = rateLimit({ key: `tickets:comment:${ip}`, limit: 120, windowMs: 60_000 });
