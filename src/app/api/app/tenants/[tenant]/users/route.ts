@@ -22,8 +22,7 @@ async function ownersCount(tenantId: string) {
   return prisma.userTenant.count({ where: { tenantId, role: UserRole.OWNER } });
 }
 
-export async function GET(_req: Request, { params }: { params: { tenant: string } }) {
-  const ctxRes = await requireTenantContextApi(params.tenant);
+export async function GET(req: Request, { params }: { params: { tenant: string } }) {  const ctxRes = await requireTenantContextApi(params.tenant);
   if (!ctxRes.ok) return ctxRes.res;
 
   const { tenantId, role } = ctxRes.ctx;
