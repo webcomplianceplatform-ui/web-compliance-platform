@@ -2,11 +2,12 @@
 
 import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { Suspense, useState } from "react";
 
-export default function LoginPage() {
+function LoginInner() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") || "/app";
 
@@ -45,5 +46,13 @@ export default function LoginPage() {
         </button>
       </form>
     </main>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginInner />
+    </Suspense>
   );
 }

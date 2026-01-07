@@ -21,7 +21,7 @@ export async function GET(req: Request) {
       status: true,
       severity: true,
       message: true,
-      meta: true,
+      metaJson: true,
       createdAt: true,
       checkId: true,
     },

@@ -79,7 +79,7 @@ async function runChecksForTenant(tenantId: string) {
     }
 
     await prisma.monitorEvent.create({
-      data: { tenantId, checkId: c.id, status, severity, message, meta },
+      data: { tenantId, checkId: c.id, status, severity, message, metaJson: meta },
     });
 
     await prisma.monitorCheck.update({

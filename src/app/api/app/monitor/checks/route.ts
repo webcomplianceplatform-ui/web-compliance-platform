@@ -1,11 +1,11 @@
 import { prisma } from "@/lib/db";
 import { requireTenantContextApi, canManageSettings } from "@/lib/tenant-auth";
-import { CheckType } from "@prisma/client";
 import { z } from "zod";
 import { parseJson, jsonOk, jsonError } from "@/lib/api-helpers";
 import { getClientIp } from "@/lib/ip";
 import { rateLimit } from "@/lib/rate-limit";
 import { auditLog } from "@/lib/audit";
+import { CheckType } from "@prisma/client";
 
 const CreateCheckSchema = z.object({
   tenant: z.string().min(1),

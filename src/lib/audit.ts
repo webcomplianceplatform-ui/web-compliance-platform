@@ -1,5 +1,12 @@
 import { prisma } from "@/lib/db";
 
+/**
+ * Centralized audit logging.
+ *
+ * NOTE: Prisma schema uses `metaJson` (NOT `meta`).
+ * We keep the public function param as `meta` for convenience/backwards-compat,
+ * but also accept `metaJson` to match some newer call sites.
+ */
 export async function auditLog(params: {
   tenantId?: string | null;
   actorUserId?: string | null;
@@ -7,8 +14,11 @@ export async function auditLog(params: {
   targetType?: string | null;
   targetId?: string | null;
   meta?: any;
+  metaJson?: any;
 }) {
   try {
+    const metaJson = params.metaJson ?? params.meta ?? undefined;
+
     await prisma.auditEvent.create({
       data: {
         tenantId: params.tenantId ?? null,
@@ -16,7 +26,7 @@ export async function auditLog(params: {
         action: params.action,
         targetType: params.targetType ?? null,
         targetId: params.targetId ?? null,
-        meta: params.meta ?? undefined,
+        metaJson,
       },
     });
   } catch {

@@ -98,11 +98,26 @@ export async function PATCH(req: Request, routeCtx: any) {
 // Ticket status/type/priority email notification (best-effort)
 try {
   if (changes.length > 0) {
-    const tenant = await prisma.tenant.findUnique({ where: { id: ctx.tenantId }, select: { slug: true, name: true, themeJson: true } });
-    const brand = (tenant?.themeJson as any)?.brandName || tenant?.name || "WebCompliance";
-    const url = `${process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"}/app/${tenant?.slug || tenant}/tickets/${params.id}`;
-    const message = `Ticket updated by ${ctx.user.email || "user"}:\n\n${changes.join("\n")}`;
-    const mail = ticketNotificationEmail({ brand, tenantSlug: tenant?.slug || tenant, ticketId: params.id, title: ticket.title, message, url });
+    const tenantRow = await prisma.tenant.findUnique({
+  where: { id: ctx.tenantId },
+  select: { slug: true, name: true, themeJson: true },
+});
+
+const tenantSlug = tenantRow?.slug || tenant; // aquí tenant sigue siendo el string del body
+const brand = (tenantRow?.themeJson as any)?.brandName || tenantRow?.name || "WebCompliance";
+
+const url = `${process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"}/app/${tenantSlug}/tickets/${params.id}`;
+const message = `Ticket updated by ${ctx.user.email || "user"}:\n\n${changes.join("\n")}`;
+
+const mail = ticketNotificationEmail({
+  brand,
+  tenantSlug,
+  ticketId: params.id,
+  title: ticket.title,
+  message,
+  url,
+});
+
     const to = await getTicketRecipientEmails({ tenantId: ctx.tenantId, ticketId: params.id, exclude: [ctx.user.email || ""] });
     await sendEmail({ tenantId: ctx.tenantId, actorUserId: ctx.user.id, to, subject: mail.subject, text: mail.text, html: mail.html, tags: { kind: "ticket_update" } });
   }

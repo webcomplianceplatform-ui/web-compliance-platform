@@ -7,9 +7,9 @@ function xmlEscape(s: string) {
 }
 
 export async function GET(_req: Request, ctx: any) {
-  const params = await routeCtx.params;
+  const params = await ctx.params;
 
-  const { tenant } = await params;
+  const { tenant } = params;
   const data = await getPublicTenant(tenant);
   if (!data) return new NextResponse("Not found", { status: 404 });
 
