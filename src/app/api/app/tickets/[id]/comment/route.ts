@@ -19,15 +19,20 @@ export async function POST(req: Request, routeCtx: any) {
 
   const ip = getClientIp(req);
   const rl = rateLimit({ key: `tickets:comment:${ip}`, limit: 120, windowMs: 60_000 });
-  if (!rl.ok) return jsonError("rate_limited", 429, { retryAfterSec: rl.retryAfterSec });
-
-  const parsed = await parseJson(req, AddCommentSchema);
-  if (!parsed.ok) return parsed.res;
-  const { tenant, body: commentBody } = parsed.data;
+  if (!rl.ok) {
+    return jsonError("rate_limited", 429, { retryAfterSec: rl.retryAfterSec });
+  }
+const parsed = await parseJson(req, AddCommentSchema);
+  if (!parsed.ok) {
+    return parsed.res;
+  }
+const { tenant, body: commentBody } = parsed.data;
 
   const auth = await requireTenantContextApi(tenant);
-  if (!auth.ok) return auth.res;
-  const { ctx } = auth;
+  if (!auth.ok) {
+    return auth.res;
+  }
+const { ctx } = auth;
 
   const ticket = await prisma.ticket.findFirst({
     where: { id: params.id, tenantId: ctx.tenantId },

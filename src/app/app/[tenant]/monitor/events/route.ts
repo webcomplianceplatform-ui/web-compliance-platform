@@ -8,9 +8,10 @@ export async function GET(req: Request) {
   if (!tenant) return NextResponse.json({ ok: false, error: "missing_tenant" }, { status: 400 });
 
   const auth = await requireTenantContextApi(tenant);
-  if (!auth.ok) return auth.res;
-
-  const events = await prisma.monitorEvent.findMany({
+  if (!auth.ok) {
+    return auth.res;
+  }
+const events = await prisma.monitorEvent.findMany({
     where: { tenantId: auth.ctx.tenantId },
     orderBy: { createdAt: "desc" },
     take: 50,

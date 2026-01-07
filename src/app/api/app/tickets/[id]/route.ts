@@ -22,17 +22,21 @@ export async function PATCH(req: Request, routeCtx: any) {
 
   const ip = getClientIp(req);
   const rl = rateLimit({ key: `tickets:update:${ip}`, limit: 60, windowMs: 60_000 });
-  if (!rl.ok) return jsonError("rate_limited", 429, { retryAfterSec: rl.retryAfterSec });
-
-  const parsed = await parseJson(req, UpdateTicketSchema);
-  if (!parsed.ok) return parsed.res;
-
-  const { tenant, status, priority, type } = parsed.data;
+  if (!rl.ok) {
+    return jsonError("rate_limited", 429, { retryAfterSec: rl.retryAfterSec });
+  }
+const parsed = await parseJson(req, UpdateTicketSchema);
+  if (!parsed.ok) {
+    return parsed.res;
+  }
+const { tenant, status, priority, type } = parsed.data;
   if (!status && !priority && !type) return jsonError("missing_fields", 400);
 
   const auth = await requireTenantContextApi(tenant);
-  if (!auth.ok) return auth.res;
-  const { ctx } = auth;
+  if (!auth.ok) {
+    return auth.res;
+  }
+const { ctx } = auth;
 
   if (!canManageTickets(ctx.role)) return jsonError("forbidden", 403);
 

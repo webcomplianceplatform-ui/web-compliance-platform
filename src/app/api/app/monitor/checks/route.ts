@@ -34,9 +34,10 @@ export async function GET(req: Request) {
   if (!tenant) return jsonError("missing_tenant", 400);
 
   const auth = await requireTenantContextApi(tenant);
-  if (!auth.ok) return auth.res;
-
-  const checks = await prisma.monitorCheck.findMany({
+  if (!auth.ok) {
+    return auth.res;
+  }
+const checks = await prisma.monitorCheck.findMany({
     where: { tenantId: auth.ctx.tenantId },
     orderBy: { createdAt: "desc" },
     take: 50,
@@ -48,17 +49,20 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const ip = getClientIp(req);
   const rl = rateLimit({ key: `monitor:checks:create:${ip}`, limit: 30, windowMs: 60_000 });
-  if (!rl.ok) return jsonError("rate_limited", 429, { retryAfterSec: rl.retryAfterSec });
-
-  const parsed = await parseJson(req, CreateCheckSchema);
-  if (!parsed.ok) return parsed.res;
-
-  const { tenant, type, targetUrl, intervalM } = parsed.data;
+  if (!rl.ok) {
+    return jsonError("rate_limited", 429, { retryAfterSec: rl.retryAfterSec });
+  }
+const parsed = await parseJson(req, CreateCheckSchema);
+  if (!parsed.ok) {
+    return parsed.res;
+  }
+const { tenant, type, targetUrl, intervalM } = parsed.data;
 
   const auth = await requireTenantContextApi(tenant);
-  if (!auth.ok) return auth.res;
-
-  if (!canManageSettings(auth.ctx.role)) return jsonError("forbidden", 403);
+  if (!auth.ok) {
+    return auth.res;
+  }
+if (!canManageSettings(auth.ctx.role)) return jsonError("forbidden", 403);
 
   const check = await prisma.monitorCheck.create({
     data: {
@@ -85,15 +89,19 @@ export async function POST(req: Request) {
 export async function PATCH(req: Request) {
   const ip = getClientIp(req);
   const rl = rateLimit({ key: `monitor:checks:update:${ip}`, limit: 60, windowMs: 60_000 });
-  if (!rl.ok) return jsonError("rate_limited", 429, { retryAfterSec: rl.retryAfterSec });
-
-  const parsed = await parseJson(req, UpdateCheckSchema);
-  if (!parsed.ok) return parsed.res;
-
-  const { tenant, id, targetUrl, intervalM, enabled } = parsed.data;
+  if (!rl.ok) {
+    return jsonError("rate_limited", 429, { retryAfterSec: rl.retryAfterSec });
+  }
+const parsed = await parseJson(req, UpdateCheckSchema);
+  if (!parsed.ok) {
+    return parsed.res;
+  }
+const { tenant, id, targetUrl, intervalM, enabled } = parsed.data;
   const auth = await requireTenantContextApi(tenant);
-  if (!auth.ok) return auth.res;
-  if (!canManageSettings(auth.ctx.role)) return jsonError("forbidden", 403);
+  if (!auth.ok) {
+    return auth.res;
+  }
+if (!canManageSettings(auth.ctx.role)) return jsonError("forbidden", 403);
 
   const existing = await prisma.monitorCheck.findFirst({
     where: { id, tenantId: auth.ctx.tenantId },
@@ -125,15 +133,19 @@ export async function PATCH(req: Request) {
 export async function DELETE(req: Request) {
   const ip = getClientIp(req);
   const rl = rateLimit({ key: `monitor:checks:delete:${ip}`, limit: 30, windowMs: 60_000 });
-  if (!rl.ok) return jsonError("rate_limited", 429, { retryAfterSec: rl.retryAfterSec });
-
-  const parsed = await parseJson(req, DeleteCheckSchema);
-  if (!parsed.ok) return parsed.res;
-
-  const { tenant, id } = parsed.data;
+  if (!rl.ok) {
+    return jsonError("rate_limited", 429, { retryAfterSec: rl.retryAfterSec });
+  }
+const parsed = await parseJson(req, DeleteCheckSchema);
+  if (!parsed.ok) {
+    return parsed.res;
+  }
+const { tenant, id } = parsed.data;
   const auth = await requireTenantContextApi(tenant);
-  if (!auth.ok) return auth.res;
-  if (!canManageSettings(auth.ctx.role)) return jsonError("forbidden", 403);
+  if (!auth.ok) {
+    return auth.res;
+  }
+if (!canManageSettings(auth.ctx.role)) return jsonError("forbidden", 403);
 
   const existing = await prisma.monitorCheck.findFirst({
     where: { id, tenantId: auth.ctx.tenantId },

@@ -26,9 +26,10 @@ export async function GET(_req: Request, ctx: any) {
   const params = await ctx.params;
 
   const ctxRes = await requireTenantContextApi(params.tenant);
-  if (!ctxRes.ok) return ctxRes.res;
-
-  const { tenantId, role } = ctxRes.ctx;
+  if (!ctxRes.ok) {
+    return ctxRes.res;
+  }
+const { tenantId, role } = ctxRes.ctx;
 
   const members = await prisma.userTenant.findMany({
     where: { tenantId },
@@ -62,18 +63,21 @@ export async function POST(req: Request, ctx: any) {
 
   const ip = getClientIp(req);
   const rl = rateLimit({ key: `users:add:${ip}`, limit: 20, windowMs: 60_000 });
-  if (!rl.ok) return jsonError("rate_limited", 429, { retryAfterSec: rl.retryAfterSec });
-
-  const ctxRes = await requireTenantContextApi(params.tenant);
-  if (!ctxRes.ok) return ctxRes.res;
-
-  const { tenantId, role: myRole, user: me } = ctxRes.ctx;
+  if (!rl.ok) {
+    return jsonError("rate_limited", 429, { retryAfterSec: rl.retryAfterSec });
+  }
+const ctxRes = await requireTenantContextApi(params.tenant);
+  if (!ctxRes.ok) {
+    return ctxRes.res;
+  }
+const { tenantId, role: myRole, user: me } = ctxRes.ctx;
   if (!canManageUsers(myRole)) return jsonError("forbidden", 403);
 
   const parsed = await parseJson(req, AddUserSchema);
-  if (!parsed.ok) return parsed.res;
-
-  const email = parsed.data.email;
+  if (!parsed.ok) {
+    return parsed.res;
+  }
+const email = parsed.data.email;
   const name = parsed.data.name?.trim() || null;
   const wantedRole = normalizeRole(parsed.data.role);
   if (!wantedRole) return jsonError("invalid_input", 400);
@@ -161,18 +165,21 @@ export async function PATCH(req: Request, ctx: any) {
 
   const ip = getClientIp(req);
   const rl = rateLimit({ key: `users:update:${ip}`, limit: 60, windowMs: 60_000 });
-  if (!rl.ok) return jsonError("rate_limited", 429, { retryAfterSec: rl.retryAfterSec });
-
-  const ctxRes = await requireTenantContextApi(params.tenant);
-  if (!ctxRes.ok) return ctxRes.res;
-
-  const { user: me, tenantId, role: myRole } = ctxRes.ctx;
+  if (!rl.ok) {
+    return jsonError("rate_limited", 429, { retryAfterSec: rl.retryAfterSec });
+  }
+const ctxRes = await requireTenantContextApi(params.tenant);
+  if (!ctxRes.ok) {
+    return ctxRes.res;
+  }
+const { user: me, tenantId, role: myRole } = ctxRes.ctx;
   if (!canManageUsers(myRole)) return jsonError("forbidden", 403);
 
   const parsed = await parseJson(req, UpdateRoleSchema);
-  if (!parsed.ok) return parsed.res;
-
-  const targetUserId = parsed.data.userId;
+  if (!parsed.ok) {
+    return parsed.res;
+  }
+const targetUserId = parsed.data.userId;
   const newRole = normalizeRole(parsed.data.role);
   if (!newRole) return jsonError("invalid_input", 400);
 
@@ -225,18 +232,21 @@ export async function DELETE(req: Request, ctx: any) {
 
   const ip = getClientIp(req);
   const rl = rateLimit({ key: `users:remove:${ip}`, limit: 60, windowMs: 60_000 });
-  if (!rl.ok) return jsonError("rate_limited", 429, { retryAfterSec: rl.retryAfterSec });
-
-  const ctxRes = await requireTenantContextApi(params.tenant);
-  if (!ctxRes.ok) return ctxRes.res;
-
-  const { user: me, tenantId, role: myRole } = ctxRes.ctx;
+  if (!rl.ok) {
+    return jsonError("rate_limited", 429, { retryAfterSec: rl.retryAfterSec });
+  }
+const ctxRes = await requireTenantContextApi(params.tenant);
+  if (!ctxRes.ok) {
+    return ctxRes.res;
+  }
+const { user: me, tenantId, role: myRole } = ctxRes.ctx;
   if (!canManageUsers(myRole)) return jsonError("forbidden", 403);
 
   const parsed = await parseJson(req, RemoveUserSchema);
-  if (!parsed.ok) return parsed.res;
-
-  const targetUserId = parsed.data.userId;
+  if (!parsed.ok) {
+    return parsed.res;
+  }
+const targetUserId = parsed.data.userId;
 
   const membership = await prisma.userTenant.findUnique({
     where: { userId_tenantId: { userId: targetUserId, tenantId } },

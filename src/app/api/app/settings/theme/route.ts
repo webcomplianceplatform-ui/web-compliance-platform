@@ -15,17 +15,20 @@ const ThemeUpdateSchema = z.object({
 export async function POST(req: Request) {
   const ip = getClientIp(req);
   const rl = rateLimit({ key: `settings:theme:${ip}`, limit: 30, windowMs: 60_000 });
-  if (!rl.ok) return jsonError("rate_limited", 429, { retryAfterSec: rl.retryAfterSec });
-
-  const parsed = await parseJson(req, ThemeUpdateSchema);
-  if (!parsed.ok) return parsed.res;
-
-  const { tenant, theme: themePatch } = parsed.data;
+  if (!rl.ok) {
+    return jsonError("rate_limited", 429, { retryAfterSec: rl.retryAfterSec });
+  }
+const parsed = await parseJson(req, ThemeUpdateSchema);
+  if (!parsed.ok) {
+    return parsed.res;
+  }
+const { tenant, theme: themePatch } = parsed.data;
 
   const auth = await requireTenantContextApi(tenant);
-  if (!auth.ok) return auth.res;
-
-  if (!canManageSettings(auth.ctx.role)) {
+  if (!auth.ok) {
+    return auth.res;
+  }
+if (!canManageSettings(auth.ctx.role)) {
     return jsonError("forbidden", 403);
   }
 
@@ -54,9 +57,10 @@ export async function GET(req: Request) {
   if (!tenant) return jsonError("missing_tenant", 400);
 
   const auth = await requireTenantContextApi(tenant);
-  if (!auth.ok) return auth.res;
-
-  const t = await prisma.tenant.findUnique({
+  if (!auth.ok) {
+    return auth.res;
+  }
+const t = await prisma.tenant.findUnique({
     where: { id: auth.ctx.tenantId },
     select: { themeJson: true },
   });

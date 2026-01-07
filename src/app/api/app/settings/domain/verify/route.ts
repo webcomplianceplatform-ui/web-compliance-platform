@@ -37,15 +37,19 @@ async function domainResolves(domain: string): Promise<boolean> {
 export async function POST(req: Request) {
   const ip = getClientIp(req);
   const rl = rateLimit({ key: `settings:domain:verify:${ip}`, limit: 20, windowMs: 60_000 });
-  if (!rl.ok) return jsonError("rate_limited", 429, { retryAfterSec: rl.retryAfterSec });
-
-  const parsed = await parseJson(req, VerifySchema);
-  if (!parsed.ok) return parsed.res;
-
-  const { tenant } = parsed.data;
+  if (!rl.ok) {
+    return jsonError("rate_limited", 429, { retryAfterSec: rl.retryAfterSec });
+  }
+const parsed = await parseJson(req, VerifySchema);
+  if (!parsed.ok) {
+    return parsed.res;
+  }
+const { tenant } = parsed.data;
   const auth = await requireTenantContextApi(tenant);
-  if (!auth.ok) return auth.res;
-  if (!canManageSettings(auth.ctx.role)) return jsonError("forbidden", 403);
+  if (!auth.ok) {
+    return auth.res;
+  }
+if (!canManageSettings(auth.ctx.role)) return jsonError("forbidden", 403);
 
   const t = await prisma.tenant.findUnique({
     where: { id: auth.ctx.tenantId },

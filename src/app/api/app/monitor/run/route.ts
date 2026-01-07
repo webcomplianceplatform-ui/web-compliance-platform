@@ -35,8 +35,10 @@ export async function POST(req: Request) {
   if (!tenantSlug) return NextResponse.json({ ok: false, error: "missing_tenant" }, { status: 400 });
 
   const auth = await requireTenantContextApi(tenantSlug);
-  if (!auth.ok) return auth.res;
-  const { tenantId } = auth.ctx;
+  if (!auth.ok) {
+    return auth.res;
+  }
+const { tenantId } = auth.ctx;
 
   if (!canManageSettings(auth.ctx.role)) return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
 
