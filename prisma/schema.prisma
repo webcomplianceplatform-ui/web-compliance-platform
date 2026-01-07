@@ -162,11 +162,10 @@ model MonitorEvent {
   tenantId  String
   checkId   String?
   status    CheckStatus
-  severity  Int         @default(1) // 1 info, 2 warn, 3 critical
+  severity  Int         @default(1)
   message   String
   metaJson  Json?
   createdAt DateTime    @default(now())
-  meta      Json?
 
   tenant Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   check  MonitorCheck? @relation(fields: [checkId], references: [id], onDelete: SetNull)
@@ -174,6 +173,7 @@ model MonitorEvent {
   @@index([tenantId])
   @@index([checkId])
 }
+
 
 model AuditEvent {
   id          String   @id @default(uuid())

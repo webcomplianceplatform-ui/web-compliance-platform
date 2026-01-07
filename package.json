@@ -2,11 +2,13 @@
   "name": "webcompliance-platform",
   "version": "0.1.0",
   "private": true,
+  "postinstall": "prisma generate",
   "scripts": {
     "dev": "cross-env NEXT_DISABLE_TURBOPACK=1 next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
+    
   },
   "dependencies": {
     "@prisma/client": "^6.19.1",

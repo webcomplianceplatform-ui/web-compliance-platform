@@ -22,7 +22,7 @@ async function ownersCount(tenantId: string) {
   return prisma.userTenant.count({ where: { tenantId, role: UserRole.OWNER } });
 }
 
-export async function GET(_req: Request, ctx: any) {
+export async function GET(_req: Request, routeCtx: any) {
   const params = await routeCtx.params;
 
   const ctxRes = await requireTenantContextApi(params.tenant);
@@ -74,7 +74,9 @@ export async function POST(req: Request, routeCtx: any) {
   }
 
   const { tenantId, role: myRole, user: me } = ctxRes.ctx;
-  if (!canManageUsers(myRole)) return jsonError("forbidden", 403);
+  if (!canManageUsers(myRole)) {
+    return jsonError("forbidden", 403);
+  }
 
   const parsed = await parseJson(req, AddUserSchema);
   if (parsed.ok === false) {
@@ -84,7 +86,9 @@ export async function POST(req: Request, routeCtx: any) {
   const email = parsed.data.email;
   const name = parsed.data.name?.trim() || null;
   const wantedRole = normalizeRole(parsed.data.role);
-  if (!wantedRole) return jsonError("invalid_input", 400);
+  if (!wantedRole) {
+    return jsonError("invalid_input", 400);
+  }
 
   // ADMIN cannot assign OWNER
   if (myRole === UserRole.ADMIN && wantedRole === UserRole.OWNER) {
@@ -131,17 +135,25 @@ export async function POST(req: Request, routeCtx: any) {
     meta: { role: wantedRole, email },
   });
 
-  
   // Email invite (best-effort)
   try {
-    const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { slug: true, name: true, themeJson: true } });
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { slug: true, name: true, themeJson: true },
+    });
+
     const brand = (tenant?.themeJson as any)?.brandName || tenant?.name || "WebCompliance";
     const loginUrl = `${process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"}/login`;
-    const mail = inviteEmail({ brand, tenantSlug: tenant?.slug || params.tenant, tempPassword: !existingUser ? tempPassword : null, loginUrl });
+    const mail = inviteEmail({
+      brand,
+      tenantSlug: tenant?.slug || params.tenant,
+      tempPassword: !existingUser ? tempPassword : null,
+      loginUrl,
+    });
 
     const notif = await getTenantNotificationEmails(tenantId);
     const fallbackAdmins = await getTenantOwnerAdminEmails(tenantId);
-    const to = (notif.ticketEmails?.length ? notif.ticketEmails : fallbackAdmins);
+    const to = notif.ticketEmails?.length ? notif.ticketEmails : fallbackAdmins;
 
     await sendEmail({
       tenantId,
@@ -179,7 +191,9 @@ export async function PATCH(req: Request, routeCtx: any) {
   }
 
   const { user: me, tenantId, role: myRole } = ctxRes.ctx;
-  if (!canManageUsers(myRole)) return jsonError("forbidden", 403);
+  if (!canManageUsers(myRole)) {
+    return jsonError("forbidden", 403);
+  }
 
   const parsed = await parseJson(req, UpdateRoleSchema);
   if (parsed.ok === false) {
@@ -188,7 +202,9 @@ export async function PATCH(req: Request, routeCtx: any) {
 
   const targetUserId = parsed.data.userId;
   const newRole = normalizeRole(parsed.data.role);
-  if (!newRole) return jsonError("invalid_input", 400);
+  if (!newRole) {
+    return jsonError("invalid_input", 400);
+  }
 
   const membership = await prisma.userTenant.findUnique({
     where: { userId_tenantId: { userId: targetUserId, tenantId } },
@@ -249,7 +265,9 @@ export async function DELETE(req: Request, routeCtx: any) {
   }
 
   const { user: me, tenantId, role: myRole } = ctxRes.ctx;
-  if (!canManageUsers(myRole)) return jsonError("forbidden", 403);
+  if (!canManageUsers(myRole)) {
+    return jsonError("forbidden", 403);
+  }
 
   const parsed = await parseJson(req, RemoveUserSchema);
   if (parsed.ok === false) {
