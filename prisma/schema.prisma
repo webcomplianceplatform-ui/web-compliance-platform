@@ -166,6 +166,7 @@ model MonitorEvent {
   message   String
   metaJson  Json?
   createdAt DateTime    @default(now())
+  meta      Json?
 
   tenant Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   check  MonitorCheck? @relation(fields: [checkId], references: [id], onDelete: SetNull)
