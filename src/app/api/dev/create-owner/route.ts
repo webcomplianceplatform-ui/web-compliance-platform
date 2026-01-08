@@ -2,12 +2,21 @@ import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
 
-export async function POST() {
+export async function POST(req: Request) {
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 });
+  }
+
   const email = "owner@demo.com";
   const password = "Demo12345!";
   const tenantSlug = "demo";
 
   const passwordHash = await bcrypt.hash(password, 10);
+const url = new URL(req.url);
+const token = req.headers.get("authorization")?.replace("Bearer ", "") || url.searchParams.get("token");
+if (!process.env.DEV_SECRET || token !== process.env.DEV_SECRET) {
+  return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+}
 
   // 1) asegurar tenant
   const tenant = await prisma.tenant.upsert({

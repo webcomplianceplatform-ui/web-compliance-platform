@@ -115,15 +115,15 @@ export async function PATCH(req: Request) {
   });
   if (!existing) return jsonError("not_found", 404);
 
-  await prisma.monitorCheck.update({
-    where: { id },
-    data: {
-      ...(typeof targetUrl === "string" ? { targetUrl } : {}),
-      ...(typeof intervalM === "number" ? { intervalM } : {}),
-      ...(typeof enabled === "boolean" ? { enabled } : {}),
-    },
-  });
-
+const r = await prisma.monitorCheck.updateMany({
+  where: { id, tenantId: auth.ctx.tenantId },
+  data: {
+    ...(typeof targetUrl === "string" ? { targetUrl } : {}),
+    ...(typeof intervalM === "number" ? { intervalM } : {}),
+    ...(typeof enabled === "boolean" ? { enabled } : {}),
+  },
+});
+if (r.count === 0) return jsonError("not_found", 404);
   await auditLog({
     tenantId: auth.ctx.tenantId,
     actorUserId: auth.ctx.user.id,
@@ -161,7 +161,10 @@ export async function DELETE(req: Request) {
   });
   if (!existing) return jsonError("not_found", 404);
 
-  await prisma.monitorCheck.delete({ where: { id } });
+const r = await prisma.monitorCheck.deleteMany({
+  where: { id, tenantId: auth.ctx.tenantId },
+});
+if (r.count === 0) return jsonError("not_found", 404);
 
   await auditLog({
     tenantId: auth.ctx.tenantId,

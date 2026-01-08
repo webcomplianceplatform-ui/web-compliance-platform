@@ -9,6 +9,25 @@ import { getClientIp } from "@/lib/ip";
 import { rateLimit } from "@/lib/rate-limit";
 import { auditLog } from "@/lib/audit";
 
+async function fetchWithTimeout(url: string, ms: number) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), ms);
+
+  try {
+    return await fetch(url, {
+      method: "GET",
+      redirect: "follow",
+      signal: controller.signal,
+      headers: {
+        "user-agent": "WebComplianceMonitor/1.0",
+      },
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+
 async function checkSsl(hostname: string, port: number) {
   return await new Promise<{ ok: boolean; daysLeft?: number; error?: string }>((resolve) => {
     const socket = tls.connect(port, hostname, { servername: hostname }, () => {
@@ -74,7 +93,7 @@ export async function POST(req: Request) {
     try {
       if (c.type === "UPTIME") {
         const start = Date.now();
-        const r = await fetch(c.targetUrl, { method: "GET", redirect: "follow" });
+        const r = await fetchWithTimeout(c.targetUrl, 12_000);
         const latencyMs = Date.now() - start;
         status = r.ok ? "OK" : "FAIL";
         message = `HTTP ${r.status}`;
@@ -149,10 +168,11 @@ try {
   console.error("monitor alert email failed", e);
 }
 
-     await prisma.monitorCheck.update({
-      where: { id: c.id },
-      data: { lastStatus: status, lastRunAt: new Date() },
-    });
+await prisma.monitorCheck.updateMany({
+  where: { id: c.id, tenantId },
+  data: { lastStatus: status, lastRunAt: new Date() },
+});
+
   }
 
   await auditLog({

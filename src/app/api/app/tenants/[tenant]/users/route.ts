@@ -62,21 +62,23 @@ const AddUserSchema = z.object({
 export async function POST(req: Request, routeCtx: any) {
   const params = await routeCtx.params;
 
-  const ip = getClientIp(req);
-  const rl = rateLimit({ key: `users:add:${ip}`, limit: 20, windowMs: 60_000 });
-  if (rl.ok === false) {
-    return jsonError("rate_limited", 429, { retryAfterSec: rl.retryAfterSec });
-  }
-
   const ctxRes = await requireTenantContextApi(params.tenant);
-  if (ctxRes.ok === false) {
-    return ctxRes.res;
-  }
+if (ctxRes.ok === false) {
+  return ctxRes.res;
+}
 
-  const { tenantId, role: myRole, user: me } = ctxRes.ctx;
-  if (!canManageUsers(myRole)) {
-    return jsonError("forbidden", 403);
-  }
+const { tenantId, role: myRole, user: me } = ctxRes.ctx;
+
+const ip = getClientIp(req);
+const rl = rateLimit({ key: `users:add:${tenantId}:${ip}`, limit: 20, windowMs: 60_000 });
+if (rl.ok === false) {
+  return jsonError("rate_limited", 429, { retryAfterSec: rl.retryAfterSec });
+}
+
+if (!canManageUsers(myRole)) {
+  return jsonError("forbidden", 403);
+}
+
 
   const parsed = await parseJson(req, AddUserSchema);
   if (parsed.ok === false) {
@@ -179,21 +181,23 @@ const UpdateRoleSchema = z.object({
 export async function PATCH(req: Request, routeCtx: any) {
   const params = await routeCtx.params;
 
-  const ip = getClientIp(req);
-  const rl = rateLimit({ key: `users:update:${ip}`, limit: 60, windowMs: 60_000 });
-  if (rl.ok === false) {
-    return jsonError("rate_limited", 429, { retryAfterSec: rl.retryAfterSec });
-  }
-
   const ctxRes = await requireTenantContextApi(params.tenant);
-  if (ctxRes.ok === false) {
-    return ctxRes.res;
-  }
+if (ctxRes.ok === false) {
+  return ctxRes.res;
+}
 
-  const { user: me, tenantId, role: myRole } = ctxRes.ctx;
-  if (!canManageUsers(myRole)) {
-    return jsonError("forbidden", 403);
-  }
+const { user: me, tenantId, role: myRole } = ctxRes.ctx;
+
+const ip = getClientIp(req);
+const rl = rateLimit({ key: `users:update:${tenantId}:${ip}`, limit: 60, windowMs: 60_000 });
+if (rl.ok === false) {
+  return jsonError("rate_limited", 429, { retryAfterSec: rl.retryAfterSec });
+}
+
+if (!canManageUsers(myRole)) {
+  return jsonError("forbidden", 403);
+}
+
 
   const parsed = await parseJson(req, UpdateRoleSchema);
   if (parsed.ok === false) {
@@ -253,21 +257,23 @@ const RemoveUserSchema = z.object({
 export async function DELETE(req: Request, routeCtx: any) {
   const params = await routeCtx.params;
 
-  const ip = getClientIp(req);
-  const rl = rateLimit({ key: `users:remove:${ip}`, limit: 60, windowMs: 60_000 });
-  if (rl.ok === false) {
-    return jsonError("rate_limited", 429, { retryAfterSec: rl.retryAfterSec });
-  }
-
   const ctxRes = await requireTenantContextApi(params.tenant);
-  if (ctxRes.ok === false) {
-    return ctxRes.res;
-  }
+if (ctxRes.ok === false) {
+  return ctxRes.res;
+}
 
-  const { user: me, tenantId, role: myRole } = ctxRes.ctx;
-  if (!canManageUsers(myRole)) {
-    return jsonError("forbidden", 403);
-  }
+const { user: me, tenantId, role: myRole } = ctxRes.ctx;
+
+const ip = getClientIp(req);
+const rl = rateLimit({ key: `users:remove:${tenantId}:${ip}`, limit: 60, windowMs: 60_000 });
+if (rl.ok === false) {
+  return jsonError("rate_limited", 429, { retryAfterSec: rl.retryAfterSec });
+}
+
+if (!canManageUsers(myRole)) {
+  return jsonError("forbidden", 403);
+}
+
 
   const parsed = await parseJson(req, RemoveUserSchema);
   if (parsed.ok === false) {
