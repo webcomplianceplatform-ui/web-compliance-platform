@@ -24,9 +24,9 @@ export const authOptions: NextAuthOptions = {
           "unknown";
 
         const rlIp = rateLimit({ key: `login:ip:${ip}`, limit: 30, windowMs: 60_000 });
-        if (!rlIp.ok) return null;
+        if (rlIp.ok === false) return null;
         const rlEmail = rateLimit({ key: `login:email:${email}`, limit: 10, windowMs: 60_000 });
-        if (!rlEmail.ok) return null;
+        if (rlEmail.ok === false) return null;
 
         const user = await prisma.user.findUnique({ where: { email } });
         if (!user?.passwordHash) return null;

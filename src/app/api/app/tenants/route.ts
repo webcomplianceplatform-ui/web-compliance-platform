@@ -56,20 +56,21 @@ const CreateTenantSchema = z.object({
 });
 
 export async function POST(req: Request) {
-  const ip = getClientIp(req);
-  const rl = rateLimit({ key: `tenants:create:${ip}`, limit: 10, windowMs: 60_000 });
-  if (rl.ok === false) {
-    return jsonError("rate_limited", 429, { retryAfterSec: rl.retryAfterSec });
-  }
+const session = await getServerSession(authOptions);
+if (!session?.user?.email) return jsonError("unauthorized", 401);
 
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.email) return jsonError("unauthorized", 401);
+const user = await prisma.user.findUnique({
+  where: { email: session.user.email },
+  select: { id: true, email: true },
+});
+if (!user) return jsonError("unauthorized", 401);
 
-  const user = await prisma.user.findUnique({
-    where: { email: session.user.email },
-    select: { id: true, email: true },
-  });
-  if (!user) return jsonError("unauthorized", 401);
+const ip = getClientIp(req);
+const rl = rateLimit({ key: `tenants:create:${user.id}:${ip}`, limit: 10, windowMs: 60_000 });
+if (rl.ok === false) {
+  return jsonError("rate_limited", 429, { retryAfterSec: rl.retryAfterSec });
+}
+
 
   const parsed = await parseJson(req, CreateTenantSchema);
   if (parsed.ok === false) {
@@ -83,6 +84,8 @@ export async function POST(req: Request) {
 
   const existing = await prisma.tenant.findUnique({ where: { slug }, select: { id: true } });
   if (existing) return jsonError("slug_taken", 409);
+const count = await prisma.userTenant.count({ where: { userId: user.id } });
+if (count >= 20) return jsonError("tenant_limit", 429);
 
   const tenant = await prisma.tenant.create({
     data: { slug, name, status: "TRIAL", themeJson: {} },
@@ -97,7 +100,7 @@ export async function POST(req: Request) {
     action: "tenant.create",
     targetType: "tenant",
     targetId: tenant.id,
-    meta: { slug: tenant.slug, name },
+    metaJson: { slug: tenant.slug, name },
   });
 
   return jsonOk({ slug: tenant.slug });

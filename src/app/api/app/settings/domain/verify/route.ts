@@ -11,47 +11,38 @@ const VerifySchema = z.object({
   tenant: z.string().min(1),
 });
 
-async function domainResolves(domain: string): Promise<boolean> {
+function normalizeDnsName(name: string) {
+  return name.toLowerCase().trim().replace(/\.$/, "");
+}
+
+async function domainPointsToExpected(domain: string): Promise<boolean> {
+  const expected = normalizeDnsName(process.env.DOMAIN_CNAME_TARGET || "");
+  if (!expected) return false;
+
   try {
-    // Try common DNS queries
-    const [a4, a6, any, cname] = await Promise.allSettled([
-      dns.resolve4(domain),
-      dns.resolve6(domain),
-      (dns as any).resolveAny ? (dns as any).resolveAny(domain) : dns.resolve4(domain),
-      dns.resolveCname(domain),
-    ]);
-
-    const ok = [a4, a6, any, cname].some(
-      (r) => r.status === "fulfilled" && Array.isArray(r.value) && r.value.length > 0
-    );
-
-    // Also allow bare lookup (covers CNAME->A chain)
-    if (ok) return true;
-    const lookup = await dns.lookup(domain);
-    return Boolean(lookup?.address);
+    const cnames = await dns.resolveCname(domain);
+    return cnames.some((c) => normalizeDnsName(c) === expected);
   } catch {
     return false;
   }
 }
 
 export async function POST(req: Request) {
-  const ip = getClientIp(req);
-  const rl = rateLimit({ key: `settings:domain:verify:${ip}`, limit: 20, windowMs: 60_000 });
-  if (rl.ok === false) {
-    return jsonError("rate_limited", 429, { retryAfterSec: rl.retryAfterSec });
-  }
-
   const parsed = await parseJson(req, VerifySchema);
-  if (parsed.ok === false) {
-    return parsed.res;
-  }
+  if (parsed.ok === false) return parsed.res;
 
   const { tenant } = parsed.data;
   const auth = await requireTenantContextApi(tenant);
-  if (auth.ok === false) {
-    return auth.res;
-  }
+  if (auth.ok === false) return auth.res;
   if (!canManageSettings(auth.ctx.role)) return jsonError("forbidden", 403);
+
+  const ip = getClientIp(req);
+  const rl = rateLimit({
+    key: `settings:domain:verify:${auth.ctx.tenantId}:${ip}`,
+    limit: 20,
+    windowMs: 60_000,
+  });
+  if (rl.ok === false) return jsonError("rate_limited", 429, { retryAfterSec: rl.retryAfterSec });
 
   const t = await prisma.tenant.findUnique({
     where: { id: auth.ctx.tenantId },
@@ -61,8 +52,8 @@ export async function POST(req: Request) {
   const domain = t?.customDomain;
   if (!domain) return jsonError("no_custom_domain", 400);
 
-  const ok = await domainResolves(domain);
-  if (!ok) return jsonError("domain_not_resolving", 400);
+  const ok = await domainPointsToExpected(domain);
+  if (!ok) return jsonError("domain_not_pointing", 400);
 
   const verifiedAt = new Date();
   await prisma.tenant.update({
@@ -77,7 +68,7 @@ export async function POST(req: Request) {
     action: "tenant.domain.verify",
     targetType: "tenant",
     targetId: auth.ctx.tenantId,
-    meta: ({ customDomain: domain } as any),
+    metaJson: { customDomain: domain },
   });
 
   return jsonOk({ customDomainVerifiedAt: verifiedAt });

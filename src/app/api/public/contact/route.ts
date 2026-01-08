@@ -9,23 +9,27 @@ import { auditLog } from "@/lib/audit";
 const ContactSchema = z.object({
   tenant: z.string().min(1),
   name: z.string().max(120).optional(),
-  email: z.string().email(),
+  email: z.string().email().transform((e) => e.trim().toLowerCase()),
   message: z.string().min(1).max(8000),
+  website: z.string().optional(), // honeypot
 });
 
 async function getOrCreateSystemUserId() {
   const email = "system@webcompliance.local";
-  const existing = await prisma.user.findUnique({ where: { email }, select: { id: true } });
-  if (existing) return existing.id;
-  const created = await prisma.user.create({ data: { email, name: "System" }, select: { id: true } });
-  return created.id;
+  const user = await prisma.user.upsert({
+    where: { email },
+    update: {},
+    create: { email, name: "System" },
+    select: { id: true },
+  });
+  return user.id;
 }
 
 export async function POST(req: Request) {
   const ip = getClientIp(req);
-  const rl = rateLimit({ key: `public:contact:${ip}`, limit: 10, windowMs: 60_000 });
-  if (rl.ok === false) {
-    return jsonError("rate_limited", 429, { retryAfterSec: rl.retryAfterSec });
+  const rlIp = rateLimit({ key: `public:contact:ip:${ip}`, limit: 10, windowMs: 60_000 });
+  if (rlIp.ok === false) {
+    return jsonError("rate_limited", 429, { retryAfterSec: rlIp.retryAfterSec });
   }
 
   const parsed = await parseJson(req, ContactSchema);
@@ -33,19 +37,44 @@ export async function POST(req: Request) {
     return parsed.res;
   }
 
-  const { tenant, name, email, message } = parsed.data;
+  const { tenant, name, email, message, website } = parsed.data;
+
+  // Honeypot: if filled -> pretend success but do nothing (anti-bot)
+  if (typeof website === "string" && website.trim().length > 0) {
+    return jsonOk({ ok: true });
+  }
+
+  const rlEmail = rateLimit({ key: `public:contact:email:${email}`, limit: 5, windowMs: 60_000 });
+  if (rlEmail.ok === false) {
+    return jsonError("rate_limited", 429, { retryAfterSec: rlEmail.retryAfterSec });
+  }
 
   const t = await prisma.tenant.findUnique({ where: { slug: tenant }, select: { id: true } });
   if (!t) return jsonError("tenant_not_found", 404);
 
   const systemUserId = await getOrCreateSystemUserId();
 
+  const title = `Web contact (${email})`;
+
+  // Dedupe: if same email contacted recently, reuse last ticket (prevents spam floods)
+  const recent = await prisma.ticket.findFirst({
+    where: {
+      tenantId: t.id,
+      title,
+      createdAt: { gte: new Date(Date.now() - 10 * 60_000) }, // 10 minutes
+    },
+    select: { id: true },
+  });
+  if (recent) {
+    return jsonOk({ id: recent.id });
+  }
+
   const ticket = await prisma.ticket.create({
     data: {
       tenantId: t.id,
       createdById: systemUserId,
       type: TicketType.CHANGE_REQUEST,
-      title: `Web contact (${email})`,
+      title,
       description: `Name: ${name ?? "-"}\nEmail: ${email}\n\nMessage:\n${message}`,
     },
     select: { id: true },
@@ -57,7 +86,7 @@ export async function POST(req: Request) {
     action: "public.contact.create_ticket",
     targetType: "ticket",
     targetId: ticket.id,
-    meta: { email },
+    metaJson: { email },
   });
 
   return jsonOk({ id: ticket.id });

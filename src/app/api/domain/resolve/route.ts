@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/db";
 import { jsonOk, jsonError } from "@/lib/api-helpers";
 import { z } from "zod";
+import { rateLimit } from "@/lib/rate-limit";
+import { getClientIp } from "@/lib/ip";
 
 const HostSchema = z.string().min(1).max(253);
 
@@ -16,6 +18,10 @@ function normalizeHost(host: string) {
 }
 
 export async function GET(req: Request) {
+  const ip = getClientIp(req);
+const rl = rateLimit({ key: `domain:resolve:${ip}`, limit: 120, windowMs: 60_000 });
+if (rl.ok === false) return jsonError("rate_limited", 429, { retryAfterSec: rl.retryAfterSec });
+
   const url = new URL(req.url);
   const rawHost = url.searchParams.get("host") ?? "";
 
