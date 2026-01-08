@@ -1,7 +1,7 @@
 {
   "crons": [
     {
-      "path": "/api/cron/monitor/run?secret=${CRON_SECRET}",
+      "path": "/api/cron/monitor/run?token=${CRON_SECRET}",
       "schedule": "0 3 * * *"
     }
   ]

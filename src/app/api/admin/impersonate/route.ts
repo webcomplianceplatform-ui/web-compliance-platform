@@ -11,17 +11,19 @@ import { rateLimit } from "@/lib/rate-limit";
 const IMPERSONATE_COOKIE = "wc_impersonate_tenant";
 
 export async function POST(req: Request) {
-  const ip = getClientIp(req);
-const rl = rateLimit({ key: `admin:impersonate:start:${ip}`, limit: 30, windowMs: 60_000 });
-if (rl.ok === false) {
-  return NextResponse.json({ ok: false, error: "rate_limited", retryAfterSec: rl.retryAfterSec }, { status: 429 });
-}
-
   const cookieStore = await cookies();
   const session = await getServerSession(authOptions);
   const email = session?.user?.email ?? null;
+
   if (!email || !isSuperadminEmail(email)) {
     return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
+  }
+
+  // ✅ rate limit AFTER auth (so we don't waste it)
+  const ip = getClientIp(req);
+  const rl = rateLimit({ key: `admin:impersonate:start:${ip}`, limit: 30, windowMs: 60_000 });
+  if (rl.ok === false) {
+    return NextResponse.json({ ok: false, error: "rate_limited", retryAfterSec: rl.retryAfterSec }, { status: 429 });
   }
 
   const body = await req.json().catch(() => null);
@@ -46,19 +48,18 @@ if (rl.ok === false) {
     secure: process.env.NODE_ENV === "production",
     path: "/",
     maxAge: 60 * 60, // 1h
-
   });
 
   // best-effort audit
   const user = await prisma.user.findUnique({ where: { email }, select: { id: true } }).catch(() => null);
-await auditLog({
-  tenantId: tenant.id,
-  actorUserId: user?.id ?? null,
-  action: "superadmin_impersonation_start",
-  targetType: "tenant",
-  targetId: tenant.id,
-  metaJson: { tenantSlug, actorEmail: email },
-});
+  await auditLog({
+    tenantId: tenant.id,
+    actorUserId: user?.id ?? null,
+    action: "superadmin_impersonation_start",
+    targetType: "tenant",
+    targetId: tenant.id,
+    metaJson: { tenantSlug, actorEmail: email },
+  });
 
   return NextResponse.json({ ok: true });
 }

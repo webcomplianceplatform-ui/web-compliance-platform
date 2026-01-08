@@ -5,6 +5,9 @@ import { authOptions } from "@/lib/auth";
 import { isSuperadminEmail } from "@/lib/superadmin";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
+import { rateLimit } from "@/lib/rate-limit";
+import { getClientIp } from "@/lib/ip";
+import { auditLog } from "@/lib/audit";
 
 const RESERVED = new Set(["api", "app", "t", "login", "logout", "auth", "admin", "www", "support"]);
 const SlugSchema = z
@@ -31,14 +34,37 @@ function forbidden() {
 
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
-  const email = session?.user?.email ?? null;
-  if (!email) return unauthorized();
-  if (!isSuperadminEmail(email)) return forbidden();
+  const actorEmail = session?.user?.email ?? null;
+  if (!actorEmail) return unauthorized();
+  if (!isSuperadminEmail(actorEmail)) return forbidden();
+
+  // ✅ Rate limit AFTER superadmin check
+  const ip = getClientIp(req);
+  const rl = rateLimit({ key: `admin:provision:${ip}`, limit: 10, windowMs: 60_000 });
+  if (rl.ok === false) {
+    return NextResponse.json(
+      { ok: false, error: "rate_limited", retryAfterSec: rl.retryAfterSec },
+      { status: 429 }
+    );
+  }
 
   const json = await req.json().catch(() => null);
   const parsed = BodySchema.safeParse(json);
   if (!parsed.success) {
     return NextResponse.json({ ok: false, error: "invalid_input", issues: parsed.error.issues }, { status: 400 });
+  }
+
+  // ✅ Rate limit by userEmail too (optional but good)
+  const rlEmail = rateLimit({
+    key: `admin:provision:email:${parsed.data.userEmail}`,
+    limit: 20,
+    windowMs: 60_000,
+  });
+  if (rlEmail.ok === false) {
+    return NextResponse.json(
+      { ok: false, error: "rate_limited", retryAfterSec: rlEmail.retryAfterSec },
+      { status: 429 }
+    );
   }
 
   const { tenantSlug, tenantName, userEmail, userName, role } = parsed.data;
@@ -87,10 +113,27 @@ export async function POST(req: Request) {
     return { tenant, user, createdOrResetPassword };
   });
 
+  // ✅ best-effort audit
+  const actor = await prisma.user.findUnique({ where: { email: actorEmail }, select: { id: true } }).catch(() => null);
+  await auditLog({
+    tenantId: result.tenant.id,
+    actorUserId: actor?.id ?? null,
+    action: "admin.provision",
+    targetType: "tenant",
+    targetId: result.tenant.id,
+    metaJson: {
+      tenantSlug: result.tenant.slug,
+      userEmail: result.user.email,
+      role,
+      tempPasswordGenerated: result.createdOrResetPassword,
+      actorEmail,
+    },
+  });
+
   return NextResponse.json({
     ok: true,
     tenant: { slug: result.tenant.slug, name: result.tenant.name },
-    user: { email: result.user.email, role: parsed.data.role },
+    user: { email: result.user.email, role },
     tempPassword: result.createdOrResetPassword ? tempPassword : null,
   });
 }

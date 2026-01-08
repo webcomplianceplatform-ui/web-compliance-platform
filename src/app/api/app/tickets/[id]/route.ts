@@ -20,27 +20,22 @@ const UpdateTicketSchema = z.object({
 export async function PATCH(req: Request, routeCtx: any) {
   const params = await routeCtx.params;
 
-  const ip = getClientIp(req);
-  const rl = rateLimit({ key: `tickets:update:${ip}`, limit: 60, windowMs: 60_000 });
-  if (rl.ok === false) {
-    return jsonError("rate_limited", 429, { retryAfterSec: rl.retryAfterSec });
-  }
-
   const parsed = await parseJson(req, UpdateTicketSchema);
-  if (parsed.ok === false) {
-    return parsed.res;
-  }
+  if (parsed.ok === false) return parsed.res;
 
   const { tenant, status, priority, type } = parsed.data;
   if (!status && !priority && !type) return jsonError("missing_fields", 400);
 
   const auth = await requireTenantContextApi(tenant);
-  if (auth.ok === false) {
-    return auth.res;
-  }
+  if (auth.ok === false) return auth.res;
   const { ctx } = auth;
 
   if (!canManageTickets(ctx.role)) return jsonError("forbidden", 403);
+
+  // ✅ RL key includes tenantId
+  const ip = getClientIp(req);
+  const rl = rateLimit({ key: `tickets:update:${ctx.tenantId}:${ip}`, limit: 60, windowMs: 60_000 });
+  if (rl.ok === false) return jsonError("rate_limited", 429, { retryAfterSec: rl.retryAfterSec });
 
   const ticket = await prisma.ticket.findFirst({
     where: { id: params.id, tenantId: ctx.tenantId },
@@ -90,40 +85,51 @@ export async function PATCH(req: Request, routeCtx: any) {
     action: "ticket.update",
     targetType: "ticket",
     targetId: params.id,
-    meta: { changes, updates },
+    metaJson: { changes, updates },
   });
 
-  
+  // Ticket status/type/priority email notification (best-effort)
+  try {
+    if (changes.length > 0) {
+      const tenantRow = await prisma.tenant.findUnique({
+        where: { id: ctx.tenantId },
+        select: { slug: true, name: true, themeJson: true },
+      });
 
-// Ticket status/type/priority email notification (best-effort)
-try {
-  if (changes.length > 0) {
-    const tenantRow = await prisma.tenant.findUnique({
-  where: { id: ctx.tenantId },
-  select: { slug: true, name: true, themeJson: true },
-});
+      const tenantSlug = tenantRow?.slug || tenant;
+      const brand = (tenantRow?.themeJson as any)?.brandName || tenantRow?.name || "WebCompliance";
 
-const tenantSlug = tenantRow?.slug || tenant; // aquí tenant sigue siendo el string del body
-const brand = (tenantRow?.themeJson as any)?.brandName || tenantRow?.name || "WebCompliance";
+      const url = `${process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"}/app/${tenantSlug}/tickets/${params.id}`;
+      const message = `Ticket updated by ${ctx.user.email || "user"}:\n\n${changes.join("\n")}`;
 
-const url = `${process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"}/app/${tenantSlug}/tickets/${params.id}`;
-const message = `Ticket updated by ${ctx.user.email || "user"}:\n\n${changes.join("\n")}`;
+      const mail = ticketNotificationEmail({
+        brand,
+        tenantSlug,
+        ticketId: params.id,
+        title: ticket.title,
+        message,
+        url,
+      });
 
-const mail = ticketNotificationEmail({
-  brand,
-  tenantSlug,
-  ticketId: params.id,
-  title: ticket.title,
-  message,
-  url,
-});
+      const to = await getTicketRecipientEmails({
+        tenantId: ctx.tenantId,
+        ticketId: params.id,
+        exclude: [ctx.user.email || ""],
+      });
 
-    const to = await getTicketRecipientEmails({ tenantId: ctx.tenantId, ticketId: params.id, exclude: [ctx.user.email || ""] });
-    await sendEmail({ tenantId: ctx.tenantId, actorUserId: ctx.user.id, to, subject: mail.subject, text: mail.text, html: mail.html, tags: { kind: "ticket_update" } });
+      await sendEmail({
+        tenantId: ctx.tenantId,
+        actorUserId: ctx.user.id,
+        to,
+        subject: mail.subject,
+        text: mail.text,
+        html: mail.html,
+        tags: { kind: "ticket_update" },
+      });
+    }
+  } catch (e) {
+    console.error("ticket update email failed", e);
   }
-} catch (e) {
-  console.error("ticket update email failed", e);
-}
 
   return jsonOk({});
 }

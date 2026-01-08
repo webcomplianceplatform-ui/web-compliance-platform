@@ -8,6 +8,7 @@ import {
 } from "@/lib/tenant-auth";
 import EmptyState from "@/components/app/EmptyState";
 import { Badge } from "@/components/ui/badge";
+import { redirect } from "next/navigation";
 
 const DAYS_7_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -63,6 +64,14 @@ export default async function TenantHome({
         select: { id: true, status: true, message: true, createdAt: true },
       }),
     ]);
+  const isEmptyTenant = totalTickets === 0 && checksTotal === 0 && lastEvents.length === 0;
+
+  // Only show onboarding to users that can actually do the setup
+  const canOnboard = isTicketManager || isUserManager || isSettingsManager;
+
+  if (canOnboard && isEmptyTenant) {
+    redirect(`/app/${tenant}/onboarding`);
+  }
 
   const statusMap = new Map(byStatus.map((s) => [s.status, s._count._all]));
   const open = statusMap.get("OPEN") ?? 0;

@@ -27,9 +27,12 @@ export async function GET(req: Request) {
   if (!tenant) return jsonError("missing_tenant", 400);
 
   const auth = await requireTenantContextApi(tenant);
-  if (auth.ok === false) {
-    return auth.res;
-  }
+  if (auth.ok === false) return auth.res;
+
+  // ✅ RL for GET too (multi-tenant key)
+  const ip = getClientIp(req);
+  const rl = rateLimit({ key: `settings:domain:get:${auth.ctx.tenantId}:${ip}`, limit: 120, windowMs: 60_000 });
+  if (rl.ok === false) return jsonError("rate_limited", 429, { retryAfterSec: rl.retryAfterSec });
 
   const t = await prisma.tenant.findUnique({
     where: { id: auth.ctx.tenantId },
@@ -44,28 +47,27 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   const parsed = await parseJson(req, DomainUpdateSchema);
-if (parsed.ok === false) return parsed.res;
+  if (parsed.ok === false) return parsed.res;
 
-const { tenant, customDomain } = parsed.data;
+  const { tenant, customDomain } = parsed.data;
 
-const auth = await requireTenantContextApi(tenant);
-if (auth.ok === false) return auth.res;
+  const auth = await requireTenantContextApi(tenant);
+  if (auth.ok === false) return auth.res;
 
-const ip = getClientIp(req);
-const rl = rateLimit({ key: `settings:domain:${auth.ctx.tenantId}:${ip}`, limit: 30, windowMs: 60_000 });
-if (rl.ok === false) {
-  return jsonError("rate_limited", 429, { retryAfterSec: rl.retryAfterSec });
-}
+  // ✅ permission guard (CRÍTICO)
+  if (!canManageSettings(auth.ctx.role)) return jsonError("forbidden", 403);
 
+  const ip = getClientIp(req);
+  const rl = rateLimit({ key: `settings:domain:set:${auth.ctx.tenantId}:${ip}`, limit: 30, windowMs: 60_000 });
+  if (rl.ok === false) return jsonError("rate_limited", 429, { retryAfterSec: rl.retryAfterSec });
 
   const normalized = customDomain ? normalizeDomain(customDomain) : null;
-  if (normalized) {
-  if (normalized.includes("*") || normalized.includes("_")) return jsonError("invalid_domain", 400);
-  if (!normalized.includes(".")) return jsonError("invalid_domain", 400);
-}
 
-  if (normalized && (normalized.includes("localhost") || normalized.includes(" "))) {
-    return jsonError("invalid_domain", 400);
+  // ✅ minimal domain sanity checks
+  if (normalized) {
+    if (normalized.includes("*") || normalized.includes("_")) return jsonError("invalid_domain", 400);
+    if (!normalized.includes(".")) return jsonError("invalid_domain", 400);
+    if (normalized.includes("localhost") || normalized.includes(" ")) return jsonError("invalid_domain", 400);
   }
 
   try {
@@ -78,10 +80,7 @@ if (rl.ok === false) {
       select: { id: true },
     });
   } catch (e: any) {
-    // Unique constraint
-    if (String(e?.code) === "P2002") {
-      return jsonError("domain_taken", 409);
-    }
+    if (String(e?.code) === "P2002") return jsonError("domain_taken", 409);
     throw e;
   }
 
@@ -91,7 +90,8 @@ if (rl.ok === false) {
     action: "tenant.domain.update",
     targetType: "tenant",
     targetId: auth.ctx.tenantId,
-    meta: normalized ? ({ customDomain: normalized } as any) : undefined,
+    // ✅ metaJson (no meta)
+    metaJson: normalized ? { customDomain: normalized } : { customDomain: null },
   });
 
   return jsonOk({ customDomain: normalized, customDomainVerifiedAt: null });

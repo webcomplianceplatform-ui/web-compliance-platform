@@ -2,9 +2,6 @@ import { prisma } from "@/lib/db";
 import { requireTenantContextApi } from "@/lib/tenant-auth";
 import { z } from "zod";
 import { parseJson, jsonOk, jsonError } from "@/lib/api-helpers";
-import { sendEmail } from "@/lib/mailer";
-import { ticketNotificationEmail } from "@/lib/email-templates/ticket";
-import { getTicketRecipientEmails } from "@/lib/notify";
 import { getClientIp } from "@/lib/ip";
 import { rateLimit } from "@/lib/rate-limit";
 import { auditLog } from "@/lib/audit";
@@ -17,23 +14,19 @@ const AddCommentSchema = z.object({
 export async function POST(req: Request, routeCtx: any) {
   const params = await routeCtx.params;
 
-  const ip = getClientIp(req);
-  const rl = rateLimit({ key: `tickets:comment:${ip}`, limit: 120, windowMs: 60_000 });
-  if (rl.ok === false) {
-    return jsonError("rate_limited", 429, { retryAfterSec: rl.retryAfterSec });
-  }
-
   const parsed = await parseJson(req, AddCommentSchema);
-  if (parsed.ok === false) {
-    return parsed.res;
-  }
+  if (parsed.ok === false) return parsed.res;
+
   const { tenant, body: commentBody } = parsed.data;
 
   const auth = await requireTenantContextApi(tenant);
-  if (auth.ok === false) {
-    return auth.res;
-  }
+  if (auth.ok === false) return auth.res;
   const { ctx } = auth;
+
+  // ✅ RL key includes tenantId
+  const ip = getClientIp(req);
+  const rl = rateLimit({ key: `tickets:comment:${ctx.tenantId}:${ip}`, limit: 120, windowMs: 60_000 });
+  if (rl.ok === false) return jsonError("rate_limited", 429, { retryAfterSec: rl.retryAfterSec });
 
   const ticket = await prisma.ticket.findFirst({
     where: { id: params.id, tenantId: ctx.tenantId },
@@ -55,6 +48,7 @@ export async function POST(req: Request, routeCtx: any) {
     action: "ticket.comment.create",
     targetType: "ticket",
     targetId: params.id,
+    metaJson: { length: commentBody.length },
   });
 
   return jsonOk({});

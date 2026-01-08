@@ -15,24 +15,19 @@ const CreateTicketSchema = z.object({
 });
 
 export async function POST(req: Request) {
-  const ip = getClientIp(req);
-  const rl = rateLimit({ key: `tickets:create:${ip}`, limit: 30, windowMs: 60_000 });
-  if (rl.ok === false) {
-    return jsonError("rate_limited", 429, { retryAfterSec: rl.retryAfterSec });
-  }
-
   const parsed = await parseJson(req, CreateTicketSchema);
-  if (parsed.ok === false) {
-    return parsed.res;
-  }
+  if (parsed.ok === false) return parsed.res;
 
   const { tenant, title, description, priority } = parsed.data;
 
   const auth = await requireTenantContextApi(tenant);
-  if (auth.ok === false) {
-    return auth.res;
-  }
+  if (auth.ok === false) return auth.res;
   const { ctx } = auth;
+
+  // ✅ RL key includes tenantId
+  const ip = getClientIp(req);
+  const rl = rateLimit({ key: `tickets:create:${ctx.tenantId}:${ip}`, limit: 30, windowMs: 60_000 });
+  if (rl.ok === false) return jsonError("rate_limited", 429, { retryAfterSec: rl.retryAfterSec });
 
   const ticket = await prisma.ticket.create({
     data: {
@@ -52,6 +47,7 @@ export async function POST(req: Request) {
     action: "ticket.create",
     targetType: "ticket",
     targetId: ticket.id,
+    metaJson: { priority: priority ?? TicketPriority.MEDIUM },
   });
 
   return jsonOk({ id: ticket.id });

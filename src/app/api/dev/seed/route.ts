@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
+import { requireDevAccess } from "@/lib/dev-guard";
 
-export async function POST() {
-  if (process.env.NODE_ENV === "production") {
-    return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 });
-  }
+export async function POST(req: Request) {
+  const gate = requireDevAccess(req);
+  if (gate.ok === false) return gate.res;
 
   return NextResponse.json({ ok: true });
 }

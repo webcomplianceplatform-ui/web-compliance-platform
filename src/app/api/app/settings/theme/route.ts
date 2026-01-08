@@ -13,22 +13,27 @@ const ThemeUpdateSchema = z.object({
 });
 
 export async function POST(req: Request) {
-const parsed = await parseJson(req, ThemeUpdateSchema);
-if (parsed.ok === false) return parsed.res;
+  const parsed = await parseJson(req, ThemeUpdateSchema);
+  if (parsed.ok === false) return parsed.res;
 
-const { tenant, theme: themePatch } = parsed.data;
+  const { tenant, theme: themePatch } = parsed.data;
 
-const auth = await requireTenantContextApi(tenant);
-if (auth.ok === false) return auth.res;
+  const auth = await requireTenantContextApi(tenant);
+  if (auth.ok === false) return auth.res;
 
-const ip = getClientIp(req);
-const rl = rateLimit({ key: `settings:theme:${auth.ctx.tenantId}:${ip}`, limit: 30, windowMs: 60_000 });
-if (rl.ok === false) {
-  return jsonError("rate_limited", 429, { retryAfterSec: rl.retryAfterSec });
-}
+  const ip = getClientIp(req);
+  const rl = rateLimit({ key: `settings:theme:${auth.ctx.tenantId}:${ip}`, limit: 30, windowMs: 60_000 });
+  if (rl.ok === false) return jsonError("rate_limited", 429, { retryAfterSec: rl.retryAfterSec });
 
-if (!canManageSettings(auth.ctx.role)) return jsonError("forbidden", 403);
+  if (!canManageSettings(auth.ctx.role)) return jsonError("forbidden", 403);
 
+  // ✅ size guard (simple): evita reventar DB con JSON enorme
+  try {
+    const raw = JSON.stringify(themePatch ?? {});
+    if (raw.length > 50_000) return jsonError("theme_too_large", 413);
+  } catch {
+    return jsonError("invalid_theme", 400);
+  }
 
   const theme = sanitizeTheme(themePatch);
 
@@ -44,7 +49,7 @@ if (!canManageSettings(auth.ctx.role)) return jsonError("forbidden", 403);
     action: "tenant.theme.update",
     targetType: "tenant",
     targetId: auth.ctx.tenantId,
-    metaJson: { updated: true }
+    metaJson: { updated: true },
   });
 
   return jsonOk({});
@@ -56,9 +61,12 @@ export async function GET(req: Request) {
   if (!tenant) return jsonError("missing_tenant", 400);
 
   const auth = await requireTenantContextApi(tenant);
-  if (auth.ok === false) {
-    return auth.res;
-  }
+  if (auth.ok === false) return auth.res;
+
+  // ✅ RL for GET too
+  const ip = getClientIp(req);
+  const rl = rateLimit({ key: `settings:theme:get:${auth.ctx.tenantId}:${ip}`, limit: 120, windowMs: 60_000 });
+  if (rl.ok === false) return jsonError("rate_limited", 429, { retryAfterSec: rl.retryAfterSec });
 
   const t = await prisma.tenant.findUnique({
     where: { id: auth.ctx.tenantId },
