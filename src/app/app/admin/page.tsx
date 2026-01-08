@@ -47,6 +47,9 @@ export default async function AdminTenantsPage({
         <Link className="rounded border px-3 py-2 text-sm" href="/app">
           Go to /app
         </Link>
+        <Link className="rounded bg-black px-3 py-2 text-sm text-white" href="/app/admin/provision">
+  Create tenant
+</Link>
       </div>
 
       <form className="flex gap-2" method="get">

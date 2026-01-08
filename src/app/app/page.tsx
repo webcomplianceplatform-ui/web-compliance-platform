@@ -35,6 +35,7 @@ export default async function AppHome() {
 
   // Conveniencia: si solo hay 1 tenant, entra directo
   if (tenants.length === 1) redirect(`/app/${tenants[0].slug}`);
+if (tenants.length === 0) redirect("/app/no-access");
 
   return <TenantSwitcherClient tenants={tenants} />;
 }
