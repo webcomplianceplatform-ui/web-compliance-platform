@@ -1,0 +1,385 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// --- Enums ---
+
+enum TenantStatus {
+  TRIAL
+  ACTIVE
+  PAUSED
+}
+
+enum UserRole {
+  OWNER
+  ADMIN
+  CLIENT
+  VIEWER
+}
+
+enum TicketType {
+  LEAD
+  CHANGE_REQUEST
+  INCIDENT
+  LEGAL
+  SEO
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  WAITING_CLIENT
+  RESOLVED
+  CLOSED
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum CheckType {
+  UPTIME
+  SSL
+}
+
+enum CheckStatus {
+  OK
+  WARN
+  FAIL
+}
+
+enum PlanTier {
+  CONTROL
+  COMPLIANCE
+  ASSURED
+}
+
+// --- Models ---
+
+model Tenant {
+  id        String       @id @default(uuid())
+  slug      String       @unique
+  name      String
+  status    TenantStatus @default(TRIAL)
+  themeJson Json?
+
+  customDomain           String?   @unique
+  customDomainVerifiedAt DateTime?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  memberships UserTenant[]
+  tickets     Ticket[]
+  checks      MonitorCheck[]
+  events      MonitorEvent[]
+
+  auditEvents    AuditEvent[]    @relation("AuditEventTenant")
+  accessEvents   AccessEvent[]
+  securityAlerts SecurityAlert[]
+  plan           TenantPlan?
+
+  evidencePackSchedule EvidencePackSchedule?
+  evidencePacks        EvidencePack[]
+}
+
+model User {
+  id           String  @id @default(uuid())
+  email        String  @unique
+  name         String?
+  passwordHash String?
+
+  clientEvidencePacks EvidencePack[] @relation("EvidencePackClientUser")
+
+  /// Bumped whenever credentials change to invalidate existing sessions.
+  sessionVersion Int @default(0)
+
+  /// If true, user must change password before continuing (set by admin reset).
+  mustChangePassword Boolean @default(false)
+
+  /// Tenant-level MFA enforcement uses these fields.
+  /// - mfaEnabled: user has completed TOTP enrollment.
+  /// - mfaSecret: base32 TOTP secret (treat as sensitive; rotate by re-enrolling).
+  mfaEnabled   Boolean   @default(false)
+  mfaSecret    String?
+  mfaEnabledAt DateTime?
+
+  /// One-time recovery codes (hashed, JSON array). Generated after MFA enrollment.
+  /// Stored as: [{ hash: string, usedAt: string|null }]
+  mfaRecoveryCodes            Json?
+  mfaRecoveryCodesGeneratedAt DateTime?
+
+  /// Last time the user successfully completed MFA verification for a tenant.
+  mfaLastVerifiedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  memberships    UserTenant[]
+  ticketsCreated Ticket[]        @relation("TicketCreatedBy")
+  comments       TicketComment[] @relation("TicketCommentAuthor")
+
+  auditEvents     AuditEvent[]    @relation("AuditEventActor")
+  accessEvents    AccessEvent[]
+  sessions        UserSession[]
+  trustedDevices  TrustedDevice[]
+  revokedSessions UserSession[]   @relation("UserSessionRevoker")
+}
+
+model UserSession {
+  id         String    @id @default(uuid())
+  userId     String
+  createdAt  DateTime  @default(now())
+  lastSeenAt DateTime?
+
+  ip         String?
+  userAgent  String?
+  deviceHash String?
+  ipHash     String?
+
+  requiresStepUp Boolean @default(false)
+
+  revokedAt       DateTime?
+  revokedByUserId String?
+  revokedReason   String?
+
+  metaJson              Json?
+  sessionVersionAtIssue Int   @default(0)
+
+  user          User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  revokedByUser User? @relation("UserSessionRevoker", fields: [revokedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([revokedAt])
+  @@index([createdAt])
+}
+
+model TrustedDevice {
+  id         String  @id @default(uuid())
+  userId     String
+  deviceHash String
+  label      String?
+
+  approvedAt DateTime  @default(now())
+  lastSeenAt DateTime?
+  revokedAt  DateTime?
+
+  metaJson Json?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([deviceHash])
+}
+
+model UserTenant {
+  id        String   @id @default(uuid())
+  userId    String
+  tenantId  String
+  role      UserRole @default(CLIENT)
+  createdAt DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tenantId])
+  @@index([tenantId])
+  @@index([userId])
+}
+
+model Ticket {
+  id          String         @id @default(cuid())
+  tenantId    String
+  createdById String
+  title       String
+  description String
+  type        TicketType     @default(CHANGE_REQUEST)
+  status      TicketStatus   @default(OPEN)
+  priority    TicketPriority @default(MEDIUM)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  tenant    Tenant          @relation(fields: [tenantId], references: [id])
+  createdBy User            @relation("TicketCreatedBy", fields: [createdById], references: [id])
+  comments  TicketComment[]
+}
+
+model TicketComment {
+  id        String   @id @default(cuid())
+  ticketId  String
+  authorId  String
+  body      String
+  createdAt DateTime @default(now())
+
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  author User   @relation("TicketCommentAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId, createdAt])
+}
+
+model MonitorCheck {
+  id         String       @id @default(uuid())
+  tenantId   String
+  type       CheckType
+  targetUrl  String
+  intervalM  Int          @default(10)
+  enabled    Boolean      @default(true)
+  lastStatus CheckStatus?
+  lastRunAt  DateTime?
+  metaJson   Json?
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  tenant Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  events MonitorEvent[]
+
+  @@index([tenantId])
+}
+
+model MonitorEvent {
+  id        String      @id @default(uuid())
+  tenantId  String
+  checkId   String?
+  status    CheckStatus
+  severity  Int         @default(1)
+  message   String
+  metaJson  Json?
+  createdAt DateTime    @default(now())
+
+  tenant Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  check  MonitorCheck? @relation(fields: [checkId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([checkId])
+}
+
+model AuditEvent {
+  id          String   @id @default(uuid())
+  tenantId    String?
+  actorUserId String?
+  action      String
+  targetType  String?
+  targetId    String?
+  metaJson    Json?
+  createdAt   DateTime @default(now())
+
+  tenant Tenant? @relation("AuditEventTenant", fields: [tenantId], references: [id], onDelete: SetNull)
+  actor  User?   @relation("AuditEventActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, createdAt])
+  @@index([actorUserId, createdAt])
+}
+
+model AccessEvent {
+  id     String @id @default(uuid())
+  userId String
+  kind   String
+
+  tenantId   String?
+  ip         String?
+  userAgent  String?
+  deviceHash String?
+  ipHash     String?
+  metaJson   Json?
+
+  createdAt DateTime @default(now())
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([tenantId, createdAt])
+  @@index([kind, createdAt])
+}
+
+model SecurityAlert {
+  id        String   @id @default(uuid())
+  tenantId  String
+  level     String   @default("INFO") // INFO | WARN
+  message   String
+  auditId   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+}
+
+model TenantPlan {
+  id          String   @id @default(uuid())
+  tenantId    String   @unique
+  plan        PlanTier @default(COMPLIANCE)
+  features    Json
+  /// Tenant security policy: if true, MFA is required for all panel users in this tenant.
+  mfaRequired Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+// --- Evidence Packs (scheduled exports) ---
+
+enum EvidencePackFrequency {
+  MONTHLY
+}
+
+model EvidencePackSchedule {
+  id         String                @id @default(uuid())
+  tenantId   String                @unique
+  enabled    Boolean               @default(true)
+  frequency  EvidencePackFrequency @default(MONTHLY)
+  dayOfMonth Int                   @default(1) // 1-28 recommended
+  hour       Int                   @default(9) // tenant local hour
+  timezone   String                @default("Europe/Madrid")
+
+  lastRunAt DateTime?
+  nextRunAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([enabled, nextRunAt])
+}
+
+model EvidencePack {
+  id           String  @id @default(uuid())
+  tenantId     String
+  clientUserId String? // optional: Agency client scope
+
+  periodStart DateTime
+  periodEnd   DateTime
+  format      String   @default("pdf")
+
+  // Storage-backed artifact
+  storageBucket String @default("evidence-packs")
+  storagePath   String
+  sizeBytes     Int    @default(0)
+  sha256        String
+
+  // WORM-lite: once finalized, treat as immutable
+  finalizedAt       DateTime?
+  finalizedByUserId String?
+
+  manifestHash String?
+  metaJson     Json? // may include domainList, counts, summary
+
+  createdAt DateTime @default(now())
+
+  tenant     Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  clientUser User?  @relation("EvidencePackClientUser", fields: [clientUserId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, clientUserId, createdAt])
+}
