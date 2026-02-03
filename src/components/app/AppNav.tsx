@@ -83,7 +83,8 @@ export function AppNav({
 
   const items = useMemo<Item[]>(
     () =>
-      [
+      (
+        [
         { type: "item", label: "Overview", href: `/app/${tenant}`, exact: true, show: true },
 
         // Evidence-first navigation
@@ -105,20 +106,17 @@ export function AppNav({
         { type: "item", label: "Incidents", href: `/app/${tenant}/incidents`, show: features.tickets || features.intake },
 
         ...(canManageSettings && features.web
-          ? ([{ type: "item", label: "Web", href: `/app/${tenant}/site`, show: true }] as Item[])
+          ? ([{ type: "item", label: "Web", href: `/app/${tenant}/site`, show: true }] satisfies Item[])
           : []),
+
         ...(canManageSettings
-          ? ([{ type: "item", label: "Settings", href: `/app/${tenant}/settings`, show: true }] as Item[])
+          ? ([{ type: "item", label: "Settings", href: `/app/${tenant}/settings`, show: true }] satisfies Item[])
           : []),
-      ]
-        .filter((x) => x.show)
-        // Hard guard: avoid duplicate href keys (prevents React key warnings)
-        .filter((it, idx, arr) => {
-          if (it.type !== "item") return true;
-          return arr.findIndex((x) => x.type === "item" && x.href === it.href) === idx;
-        }),
+        ] satisfies Item[]
+      ).filter((x) => x.show),
     [tenant, canManageSettings, features, isAgency]
   );
+
 
   const pathname = usePathname();
   const [open, setOpen] = useState(false);

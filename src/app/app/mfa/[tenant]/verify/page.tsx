@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 
 type VerifyResp = { ok: boolean; error?: string };
 
-export default function MfaVerifyPage() {
+function MfaVerifyInner() {
   const search = useSearchParams();
   const params = useParams() as { tenant?: string };
   const tenant = String(params.tenant || "");
@@ -85,5 +85,13 @@ export default function MfaVerifyPage() {
 
       <div className="text-xs text-muted-foreground">Security note: we only verify what matters. Routine activity is excluded.</div>
     </main>
+  );
+}
+
+export default function MfaVerifyPage() {
+  return (
+    <Suspense fallback={<div className="p-6 text-sm text-muted-foreground">Loading…</div>}>
+      <MfaVerifyInner />
+    </Suspense>
   );
 }

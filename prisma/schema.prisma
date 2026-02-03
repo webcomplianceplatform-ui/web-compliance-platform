@@ -176,6 +176,7 @@ model TrustedDevice {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@unique([userId, deviceHash])
   @@index([userId])
   @@index([deviceHash])
 }
@@ -268,6 +269,8 @@ model AuditEvent {
   action      String
   targetType  String?
   targetId    String?
+  ip        String?
+  userAgent String?
   metaJson    Json?
   createdAt   DateTime @default(now())
 
@@ -277,6 +280,7 @@ model AuditEvent {
   @@index([tenantId, createdAt])
   @@index([actorUserId, createdAt])
 }
+
 
 model AccessEvent {
   id     String @id @default(uuid())

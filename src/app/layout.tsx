@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { Suspense } from "react";
 import "./globals.css";
 import { ToastProvider } from "@/components/ui/toast";
 import { RouteProgress } from "@/components/app/RouteProgress";
@@ -30,7 +31,10 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <ToastProvider>
-          <RouteProgress />
+          {/* RouteProgress uses useSearchParams; wrap it to satisfy Next.js prerendering rules */}
+          <Suspense fallback={null}>
+            <RouteProgress />
+          </Suspense>
           {children}
         </ToastProvider>
       </body>

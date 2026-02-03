@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import QRCode from "qrcode";
 
 type SetupResp = { ok: boolean; secret?: string; otpauth?: string; error?: string };
 type VerifyResp = { ok: boolean; error?: string };
 
-export default function MfaEnrollPage() {
+function MfaEnrollInner() {
   const router = useRouter();
   const search = useSearchParams();
   const params = useParams() as { tenant?: string };
@@ -132,5 +132,13 @@ export default function MfaEnrollPage() {
         Tip: use Google Authenticator, Microsoft Authenticator, Authy, or 1Password.
       </div>
     </main>
+  );
+}
+
+export default function MfaEnrollPage() {
+  return (
+    <Suspense fallback={null}>
+      <MfaEnrollInner />
+    </Suspense>
   );
 }

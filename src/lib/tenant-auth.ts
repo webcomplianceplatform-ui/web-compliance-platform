@@ -108,7 +108,7 @@ export async function requireTenantContextApi(
   // Enforce server-side session validity (sessionVersion + per-session revoke).
   const { enforceSessionActiveApi } = await import("@/lib/session");
   const active = await enforceSessionActiveApi({ sessionUser: session.user as any, dbUser: { id: user.id, sessionVersion: user.sessionVersion ?? 0 } });
-  if (!active.ok) return active;
+  if (!active.ok) return { ok: false as const, res: active.res };
 
   const membership = await prisma.userTenant.findFirst({
     where: { userId: user.id, tenant: { slug: tenantSlug } },

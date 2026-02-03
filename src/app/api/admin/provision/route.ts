@@ -124,8 +124,8 @@ export async function POST(req: Request) {
       update: {},
       create: {
         tenantId: tenant.id,
-        planTier: "COMPLIANCE",
-        planFeatures: {
+        plan: "COMPLIANCE",
+        features: {
           tier: "COMPLIANCE",
           addons: { webSimple: false, security: false },
           overrides: {},
@@ -138,7 +138,6 @@ export async function POST(req: Request) {
   });
 
   // ✅ best-effort audit
-  const actor = await prisma.user.findUnique({ where: { email: actorEmail }, select: { id: true } }).catch(() => null);
   await auditLog({
     tenantId: result.tenant.id,
     actorUserId: actor?.id ?? null,

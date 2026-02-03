@@ -38,6 +38,10 @@ export type EvidenceBundle = {
 export async function buildEvidenceBundle(args: {
   tenantId: string;
   rangeDays: number;
+  /** Optional agency scope (client). Used for labeling + integrity hashing.
+   *  Note: data is still tenant-scoped unless you model client/domain ownership.
+   */
+  clientUserId?: string;
 }): Promise<EvidenceBundle> {
   const to = new Date();
   const from = new Date(Date.now() - args.rangeDays * 24 * 60 * 60 * 1000);
@@ -97,6 +101,7 @@ export async function buildEvidenceBundle(args: {
   // Note: this is not a cryptographic notarization; it is a deterministic checksum to detect tampering.
   const normalized = {
     tenantId: args.tenantId,
+    clientUserId: args.clientUserId ?? null,
     domain,
     rangeDays: args.rangeDays,
     from: from.toISOString(),

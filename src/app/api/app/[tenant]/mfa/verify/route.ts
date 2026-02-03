@@ -149,7 +149,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ tenant:
             deviceHash: s.deviceHash,
             label: "Approved after MFA",
             approvedAt: new Date(),
-            firstSeenAt: new Date(),
             lastSeenAt: new Date(),
             metaJson: { source: "mfa.verify", tenantId: ctxRes.ctx.tenantId, userAgent: s.userAgent ?? null },
           },

@@ -66,7 +66,6 @@ export async function POST(req: Request) {
             deviceHash: s.deviceHash,
             label: "Approved after MFA",
             approvedAt: new Date(),
-            firstSeenAt: new Date(),
             lastSeenAt: new Date(),
             metaJson: { source: "mfa.verify", userAgent: s.userAgent ?? null },
           },

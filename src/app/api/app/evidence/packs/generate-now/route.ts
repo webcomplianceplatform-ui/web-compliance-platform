@@ -43,7 +43,8 @@ export async function POST(req: Request) {
     tenantSlug: tenant,
     tenantName: null,
     planLabel: plan,
-    reportKind: clientUserId ? "client_pack" : "pack",
+    // PDF template supports "pack" | "report". Client scoping is carried via clientUserId + bundle.client.
+    reportKind: "pack",
     bundle: {
       tenantId: auth.ctx.tenantId,
       generatedAt: (bundle as any)?.manifest?.generatedAt ?? new Date().toISOString(),

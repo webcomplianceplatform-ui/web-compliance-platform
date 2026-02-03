@@ -53,7 +53,6 @@ export async function GET(req: Request) {
       tenantSlug: tenant,
       planLabel: plan,
       reportKind: kind === "pack" ? "pack" : "report",
-      domainHint: (bundle as any)?.manifest?.domain ?? null,
       bundle: {
         tenantId: auth.ctx.tenantId,
         generatedAt: (bundle as any)?.manifest?.generatedAt ?? new Date().toISOString(),

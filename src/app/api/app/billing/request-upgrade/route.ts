@@ -33,7 +33,7 @@ export async function POST(req: Request) {
 
   const title = `Upgrade request → ${desiredPlan === "BUSINESS" ? "Business" : "Agency"}`;
   const lines = [
-    `Tenant: ${auth.ctx.slug} (${auth.ctx.tenantId})`,
+`TenantId: ${auth.ctx.tenantId}`,
     `Requested plan: ${desiredPlan}`,
     typeof domainsCount === "number" ? `Domains (approx): ${domainsCount}` : null,
     contactEmail ? `Contact: ${contactEmail}` : `Contact: ${auth.ctx.user.email ?? "unknown"}`,

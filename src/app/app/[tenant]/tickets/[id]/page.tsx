@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { requireTenantContextPage, canManageTickets } from "@/lib/tenant-auth";
 import TicketActions from "./ticket-actions";
+import { redirect } from "next/navigation";
 
 export default async function TicketDetailPage({
   params,

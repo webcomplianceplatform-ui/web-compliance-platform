@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { getBaseUrl, publicCanonical } from "@/lib/seo";
 import { pageTitle } from "@/lib/seo-titles";
 import ConsentManager from "@/components/public/ConsentManager";
+import { Suspense } from "react";
 import LegalShell from "@/components/public/legal/LegalShell";
 export async function generateMetadata({
   params,
@@ -49,7 +50,9 @@ export default async function CookiesPage({
     return (
       <LegalShell title="Política de cookies" lastUpdated={l.lastUpdated}>
         <div className="not-prose my-4">
-          <ConsentManager usesAnalytics={!!l.usesAnalytics} />
+          <Suspense fallback={null}>
+            <ConsentManager usesAnalytics={!!l.usesAnalytics} />
+          </Suspense>
         </div>
         <pre className="whitespace-pre-wrap text-sm leading-6">{custom}</pre>
       </LegalShell>
@@ -60,7 +63,11 @@ export default async function CookiesPage({
     <LegalShell title="Política de cookies" lastUpdated={l.lastUpdated}>
       {/* Gestión de consentimiento (solo cliente) */}
       <div className="not-prose my-4">
-        <ConsentManager usesAnalytics={!!l.usesAnalytics} />
+        <Suspense fallback={null}>
+          <Suspense fallback={null}>
+            <ConsentManager usesAnalytics={!!l.usesAnalytics} />
+          </Suspense>
+        </Suspense>
       </div>
 
       <p>

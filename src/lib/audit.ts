@@ -13,23 +13,29 @@ export async function auditLog(params: {
   action: string;
   targetType?: string | null;
   targetId?: string | null;
+  ip?: string | null;
+  userAgent?: string | null;
   meta?: any;
   metaJson?: any;
 }) {
+
   try {
     const metaJson = params.metaJson ?? params.meta ?? undefined;
 
     const audit = await prisma.auditEvent.create({
-      data: {
-        tenantId: params.tenantId ?? null,
-        actorUserId: params.actorUserId ?? null,
-        action: params.action,
-        targetType: params.targetType ?? null,
-        targetId: params.targetId ?? null,
-        metaJson,
-      },
-      select: { id: true, tenantId: true, action: true, createdAt: true },
-    });
+  data: {
+    tenantId: params.tenantId ?? null,
+    actorUserId: params.actorUserId ?? null,
+    action: params.action,
+    targetType: params.targetType ?? null,
+    targetId: params.targetId ?? null,
+    ip: params.ip ?? null,
+    userAgent: params.userAgent ?? null,
+    metaJson,
+  },
+  select: { id: true, tenantId: true, action: true, createdAt: true },
+});
+
 
     // Best-effort: Security alerts (only when tenant has Security add-on enabled)
     if (audit.tenantId) {

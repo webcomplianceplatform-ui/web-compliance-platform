@@ -159,7 +159,6 @@ export function sanitizeTheme(input: any) {
 
     siteBuilder: t.siteBuilder ?? null,
 
-    siteBuilder: t.siteBuilder ?? null,
 
     // ✅ NUEVO
     legal: {

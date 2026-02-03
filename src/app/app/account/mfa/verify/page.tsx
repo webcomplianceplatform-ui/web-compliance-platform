@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 function classNames(...xs: Array<string | false | null | undefined>) {
   return xs.filter(Boolean).join(" ");
 }
 
-export default function VerifyMfaGlobalPage() {
+function VerifyMfaGlobalInner() {
   const sp = useSearchParams();
   const callbackUrl = sp.get("callbackUrl") ?? "/app/admin";
   const [token, setToken] = useState("");
@@ -76,5 +76,13 @@ export default function VerifyMfaGlobalPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function VerifyMfaGlobalPage() {
+  return (
+    <Suspense fallback={<div className="p-6 text-sm text-muted-foreground">Loading…</div>}>
+      <VerifyMfaGlobalInner />
+    </Suspense>
   );
 }

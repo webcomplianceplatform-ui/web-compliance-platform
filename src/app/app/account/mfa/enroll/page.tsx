@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 function classNames(...xs: Array<string | false | null | undefined>) {
   return xs.filter(Boolean).join(" ");
 }
 
-export default function EnrollMfaGlobalPage() {
+function EnrollMfaGlobalInner() {
   const router = useRouter();
   const sp = useSearchParams();
   const callbackUrl = sp.get("callbackUrl") || "/app/admin";
@@ -138,5 +138,14 @@ export default function EnrollMfaGlobalPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function EnrollMfaGlobalPage() {
+  // Next.js requires useSearchParams() to be under a Suspense boundary.
+  return (
+    <Suspense fallback={null}>
+      <EnrollMfaGlobalInner />
+    </Suspense>
   );
 }

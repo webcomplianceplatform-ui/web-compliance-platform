@@ -17,11 +17,14 @@ export async function POST(req: Request) {
     const ip = getClientIp(req);
     const rl = rateLimit({ key: `intake:demo:${ip}`, windowMs: 15 * 60 * 1000, limit: 10 });
     if (!rl.ok) {
-      return NextResponse.json(
-        { ok: false, error: "rate_limited", retryAfterSec: rl.retryAfterSec },
-        { status: 429, headers: { "Retry-After": String(rl.retryAfterSec) } },
-      );
-    }
+  const retryAfterSec = "retryAfterSec" in rl ? rl.retryAfterSec : 60;
+
+  return NextResponse.json(
+    { ok: false, error: "rate_limited", retryAfterSec },
+    { status: 429, headers: { "Retry-After": String(retryAfterSec) } },
+  );
+}
+
 
     const body = (await req.json().catch(() => ({}))) as Payload;
     const email = String(body.email ?? "").trim().toLowerCase();
@@ -96,7 +99,7 @@ export async function POST(req: Request) {
       action: "intake.demo",
       targetType: "Ticket",
       targetId: ticket.id,
-      ip,
+      ip: ip,
       userAgent: req.headers.get("user-agent") ?? "",
       meta: { email, company },
     }).catch(() => null);
