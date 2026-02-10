@@ -1,10 +1,8 @@
-import Link from "next/link";
-import { PublicNav, type PublicNavItem } from "@/components/public/PublicNav";
-import { getPublicTenant } from "@/lib/public-tenant";
-import { defaultTheme } from "@/lib/theme";
 import CookieBanner from "@/components/public/CookieBanner";
 import AnalyticsLoader from "@/components/public/AnalyticsLoader";
 import PublicFooter from "@/components/public/PublicFooter";
+import { getPublicTenant } from "@/lib/public-tenant";
+import { defaultTheme } from "@/lib/theme";
 import type { Metadata } from "next";
 import { getBaseUrl } from "@/lib/seo";
 
@@ -27,7 +25,7 @@ function cssVarColor(value: string | null | undefined, fallback: string) {
   return v ? v : fallback;
 }
 
-export default async function TenantPublicLayout({
+export default async function TenantPublicBaseLayout({
   children,
   params,
 }: {
@@ -37,22 +35,15 @@ export default async function TenantPublicLayout({
   const { tenant } = await params;
   const data = await getPublicTenant(tenant);
 
-  const theme = data?.theme;
+  const theme = data?.theme ?? defaultTheme;
   const primary = cssVarColor(theme?.primary, "#111111");
   const accent = cssVarColor(theme?.accent, "#F59E0B");
 
   const brandName = theme?.brandName ?? data?.tenant.name ?? tenant;
-  const logoUrl = theme?.logoUrl ?? null;
+
   const usesAnalytics = !!theme?.legal?.usesAnalytics;
   const analyticsProvider = theme?.legal?.analyticsProvider ?? null;
   const analyticsId = theme?.legal?.analyticsId ?? null;
-
-  const primaryLinks: PublicNavItem[] = (theme?.navigation?.primary ?? defaultTheme.navigation?.primary ?? []).map(
-    (x) => {
-      const path = x.href === "/" ? "" : x.href;
-      return { href: `/t/${tenant}${path}`, label: x.label };
-    }
-  );
 
   return (
     <div
@@ -64,46 +55,12 @@ export default async function TenantPublicLayout({
         } as React.CSSProperties
       }
     >
-      <header
-        className="relative border-b"
-        style={{ borderColor: "color-mix(in srgb, var(--brand-primary) 18%, transparent)" }}
-      >
-        <div className="mx-auto flex max-w-5xl items-center justify-between p-4">
-          <Link href={`/t/${tenant}`} className="flex items-center gap-3">
-            {logoUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={logoUrl} alt={brandName} className="h-8 w-8 rounded object-cover" />
-            ) : (
-              <div
-                className="flex h-8 w-8 items-center justify-center rounded text-xs font-semibold text-white"
-                style={{ background: "var(--brand-primary)" }}
-              >
-                {brandName.slice(0, 2).toUpperCase()}
-              </div>
-            )}
-
-            <span className="font-semibold">{brandName}</span>
-          </Link>
-
-          {/* Desktop */}
-          <nav className="hidden gap-4 text-sm md:flex">
-            {primaryLinks.map((it) => (
-              <Link key={it.href} className="hover:underline" href={it.href}>
-                {it.label}
-              </Link>
-            ))}
-          </nav>
-
-          {/* Mobile */}
-          <PublicNav items={primaryLinks} />
-        </div>
-      </header>
-
-      <div className="mx-auto max-w-5xl p-6">{children}</div>
+      {children}
 
       {/* Analítica (solo si hay consentimiento) */}
       <AnalyticsLoader usesAnalytics={usesAnalytics} provider={analyticsProvider} analyticsId={analyticsId} />
 
+      {/* Footer público (incluye enlaces a legal) */}
       <PublicFooter
         tenant={tenant}
         brandName={brandName}
@@ -115,9 +72,8 @@ export default async function TenantPublicLayout({
         usesAnalytics={usesAnalytics}
       />
 
-      {/* Banner cookies (solo si aplica) */}
+      {/* Banner cookies (si no hay consentimiento) */}
       <CookieBanner tenant={tenant} usesAnalytics={usesAnalytics} />
-
     </div>
   );
 }

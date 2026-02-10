@@ -962,11 +962,30 @@ export default function SettingsClient({
                 </label>
                 <label className="text-sm">
                   Analytics provider
-                  <AppInput className="mt-1" value={theme.legal?.analyticsProvider ?? ""} onChange={(e) => setLegal({ analyticsProvider: e.target.value })} placeholder="Google Analytics" />
+                  <select
+                    className="mt-1 h-10 w-full rounded-2xl border border-border bg-bg2/50 px-3 text-sm text-foreground backdrop-blur transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30 focus-visible:border-brand2"
+                    value={(theme.legal?.analyticsProvider ?? "").toString()}
+                    onChange={(e) => setLegal({ analyticsProvider: e.target.value })}
+                  >
+                    <option value="">(none)</option>
+                    <option value="Plausible">Plausible</option>
+                    <option value="Google Analytics (GA4)">Google Analytics (GA4)</option>
+                  </select>
+                  <div className="mt-1 text-[11px] text-muted-foreground">
+                    Recomendado: Plausible (más simple y privacy-friendly). GA4 si necesitas campañas/ads.
+                  </div>
                 </label>
                 <label className="text-sm">
                   Analytics ID
-                  <AppInput className="mt-1" value={theme.legal?.analyticsId ?? ""} onChange={(e) => setLegal({ analyticsId: e.target.value })} placeholder="G-XXXXXXX" />
+                  <AppInput
+                    className="mt-1"
+                    value={theme.legal?.analyticsId ?? ""}
+                    onChange={(e) => setLegal({ analyticsId: e.target.value })}
+                    placeholder={(theme.legal?.analyticsProvider ?? "").toLowerCase().includes("plausible") ? "example.com" : "G-XXXXXXX"}
+                  />
+                  <div className="mt-1 text-[11px] text-muted-foreground">
+                    Plausible: usa el dominio (p.ej. <span className="font-mono">example.com</span>). GA4: Measurement ID (p.ej. <span className="font-mono">G-XXXXXXX</span>).
+                  </div>
                 </label>
                 <label className="text-sm md:col-span-2">
                   Last updated

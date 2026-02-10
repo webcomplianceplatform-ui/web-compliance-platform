@@ -51,7 +51,7 @@ export default async function CookiesPage({
       <LegalShell title="Política de cookies" lastUpdated={l.lastUpdated}>
         <div className="not-prose my-4">
           <Suspense fallback={null}>
-            <ConsentManager usesAnalytics={!!l.usesAnalytics} />
+            <ConsentManager tenant={tenant} usesAnalytics={!!l.usesAnalytics} />
           </Suspense>
         </div>
         <pre className="whitespace-pre-wrap text-sm leading-6">{custom}</pre>
@@ -64,9 +64,7 @@ export default async function CookiesPage({
       {/* Gestión de consentimiento (solo cliente) */}
       <div className="not-prose my-4">
         <Suspense fallback={null}>
-          <Suspense fallback={null}>
-            <ConsentManager usesAnalytics={!!l.usesAnalytics} />
-          </Suspense>
+          <ConsentManager tenant={tenant} usesAnalytics={!!l.usesAnalytics} />
         </Suspense>
       </div>
 

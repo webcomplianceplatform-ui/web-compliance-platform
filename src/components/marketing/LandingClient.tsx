@@ -12,6 +12,7 @@ import {
 import Link from "next/link";
 import Image from "next/image";
 import { motion } from "framer-motion";
+import CookieBanner from "@/components/public/CookieBanner";
 import {
   Activity,
   ArrowRight,
@@ -1085,6 +1086,9 @@ export default function LandingClient() {
 
         <DemoModal open={demoOpen} onClose={() => setDemoOpen(false)} t={t} />
       </main>
+
+      {/* Marketing site cookie banner (logs evidence to the platform tenant). */}
+      <CookieBanner tenant="webcompliance" usesAnalytics={true} />
     </div>
   );
 }

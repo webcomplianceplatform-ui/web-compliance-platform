@@ -70,6 +70,7 @@ export default async function LegalPage({ params }: { params: Promise<{ tenant: 
         <div className="text-sm font-medium">Quick links</div>
         <div className="mt-3 flex flex-wrap gap-2">
           <Link className="inline-flex rounded-xl border bg-bg2/60 px-3 py-2 text-sm hover:bg-bg2/80" href={`/app/${tenant}/settings?tab=legal`}>Legal</Link>
+          <Link className="inline-flex rounded-xl border bg-bg2/60 px-3 py-2 text-sm hover:bg-bg2/80" href={`/app/${tenant}/evidence/legal/consents`}>Consent logs</Link>
           <Link className="inline-flex rounded-xl border bg-bg2/60 px-3 py-2 text-sm hover:bg-bg2/80" href={`/app/${tenant}/settings?tab=public`}>Branding</Link>
           <Link className="inline-flex rounded-xl border bg-bg2/60 px-3 py-2 text-sm hover:bg-bg2/80" href={`/app/${tenant}/tickets?type=LEGAL`}>Legal tickets</Link>
         </div>

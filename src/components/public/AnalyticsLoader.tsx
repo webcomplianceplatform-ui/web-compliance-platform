@@ -2,7 +2,7 @@
 
 import Script from "next/script";
 import { useEffect, useMemo, useState } from "react";
-import { getConsent } from "@/lib/consent-client";
+import { getConsentCategories } from "@/lib/consent-client";
 
 type Props = {
   usesAnalytics: boolean;
@@ -23,7 +23,7 @@ export default function AnalyticsLoader({ usesAnalytics, provider, analyticsId }
 
   useEffect(() => {
     if (!usesAnalytics) return;
-    const sync = () => setAllowed(getConsent() === "accepted");
+    const sync = () => setAllowed(!!getConsentCategories()?.analytics);
     sync();
     window.addEventListener("wcp_consent_change", sync);
     return () => window.removeEventListener("wcp_consent_change", sync);
@@ -54,6 +54,18 @@ export default function AnalyticsLoader({ usesAnalytics, provider, analyticsId }
           `}
         </Script>
       </>
+    );
+  }
+
+  // Plausible: analyticsId should be the domain, e.g. "example.com".
+  if (kind === "plausible") {
+    return (
+      <Script
+        id="plausible-src"
+        strategy="afterInteractive"
+        src="https://plausible.io/js/script.js"
+        data-domain={id}
+      />
     );
   }
 
