@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { defaultTheme, TenantTheme } from "@/lib/theme";
 import { AppButton } from "@/components/app-ui/AppButton";
@@ -11,6 +11,22 @@ type TabId = "public" | "domain" | "notifications" | "seo" | "legal" | "usage" |
 
 function cn(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
+}
+
+function isObject(v: unknown): v is Record<string, any> {
+  return !!v && typeof v === "object" && !Array.isArray(v);
+}
+
+function mergeTheme<T>(base: T, patch: any): T {
+  if (!isObject(patch)) return base;
+
+  const out: any = Array.isArray(base) ? [...(base as any)] : { ...(base as any) };
+  for (const [k, v] of Object.entries(patch)) {
+    if (v === undefined) continue;
+    if (isObject(v) && isObject((out as any)[k])) out[k] = mergeTheme((out as any)[k], v);
+    else out[k] = v;
+  }
+  return out;
 }
 
 const TAB_ACTIVE = "border-transparent bg-[#dbf676] text-black";
@@ -79,6 +95,7 @@ export default function SettingsClient({
   }, [searchParams]);
 
   const [theme, setTheme] = useState<TenantTheme>(defaultTheme);
+  const themePatchRef = useRef<Partial<TenantTheme>>({});
   const [customDomain, setCustomDomain] = useState<string>("");
   const [customDomainVerifiedAt, setCustomDomainVerifiedAt] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
@@ -95,6 +112,11 @@ export default function SettingsClient({
   const [domainsCount, setDomainsCount] = useState<number>(1);
   const [contactEmail, setContactEmail] = useState<string>("");
   const [upgradeNotes, setUpgradeNotes] = useState<string>("");
+
+  const applyPublicPatch = (patch: Partial<TenantTheme>) => {
+    setTheme((t) => mergeTheme(t, patch));
+    themePatchRef.current = mergeTheme(themePatchRef.current as any, patch);
+  };
 
   const navItems = useMemo(() => theme.navigation?.primary ?? [], [theme.navigation?.primary]);
 
@@ -124,9 +146,11 @@ export default function SettingsClient({
           cache: "no-store",
         });
         const data = await res.json();
+        themePatchRef.current = {};
         if (data.ok && data.theme) setTheme(data.theme as TenantTheme);
         else setTheme(defaultTheme);
       } catch {
+        themePatchRef.current = {};
         setTheme(defaultTheme);
         setMsg("No se pudo cargar el theme (usando defaults).");
       } finally {
@@ -170,21 +194,23 @@ export default function SettingsClient({
     setSaving(true);
     try {
       // 🔐 Save only safe theme keys here. Sensitive keys go through dedicated endpoints.
-      const safe: any = { ...(theme as any) };
+      const safe: any = { ...(themePatchRef.current as any) };
       delete safe.legal;
       delete safe.legalDocs;
       delete safe.seo;
       delete safe.siteBuilder;
 
-      const res = await fetch("/api/app/settings/theme", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ tenant, theme: safe }),
-      });
-      const data = await res.json();
-      if (!data.ok) {
-        setMsg(`Error: ${data.error ?? "error"}`);
-        return;
+      if (Object.keys(safe).length > 0) {
+        const res = await fetch("/api/app/settings/theme", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ tenant, theme: safe }),
+        });
+        const data = await res.json();
+        if (!data.ok) {
+          setMsg(`Error: ${data.error ?? "error"}`);
+          return;
+        }
       }
 
       // Sensitive writes (only superadmin)
@@ -220,6 +246,7 @@ export default function SettingsClient({
         }
       }
 
+      themePatchRef.current = {};
       setMsg("Saved ✅");
     } catch {
       setMsg("Error: could not save");
@@ -277,10 +304,7 @@ export default function SettingsClient({
   };
 
   const setHero = (patch: Partial<NonNullable<TenantTheme["hero"]>>) => {
-    setTheme((t) => ({
-      ...t,
-      hero: { ...(t.hero ?? { headline: "" }), ...patch },
-    }));
+    applyPublicPatch({ hero: patch as any });
   };
 
   const setSeo = (patch: Partial<NonNullable<TenantTheme["seo"]>>) => {
@@ -291,20 +315,11 @@ export default function SettingsClient({
   };
 
   const setContact = (patch: Partial<NonNullable<NonNullable<TenantTheme["pages"]>["contact"]>>) => {
-    setTheme((t) => ({
-      ...t,
-      pages: {
-        ...(t.pages ?? {}),
-        contact: { ...((t.pages?.contact ?? {}) as any), ...patch },
-      },
-    }));
+    applyPublicPatch({ pages: { contact: patch as any } as any });
   };
 
   const setFooter = (patch: Partial<NonNullable<TenantTheme["footer"]>>) => {
-    setTheme((t) => ({
-      ...t,
-      footer: { ...(t.footer ?? {}), ...patch },
-    }));
+    applyPublicPatch({ footer: patch as any });
   };
 
   const setLegalDocs = (patch: Partial<NonNullable<TenantTheme["legalDocs"]>>) => {
@@ -322,44 +337,20 @@ export default function SettingsClient({
   };
 
   const setNavItem = (idx: number, patch: Partial<(typeof navItems)[number]>) => {
-    setTheme((t) => {
-      const cur = t.navigation?.primary ?? [];
-      const next = cur.map((it, i) => (i === idx ? { ...it, ...patch } : it));
-      return {
-        ...t,
-        navigation: {
-          ...(t.navigation ?? {}),
-          primary: next,
-        },
-      };
-    });
+    const cur = theme.navigation?.primary ?? [];
+    const next = cur.map((it, i) => (i === idx ? { ...it, ...patch } : it));
+    applyPublicPatch({ navigation: { primary: next } as any });
   };
 
   const addNavItem = () => {
-    setTheme((t) => {
-      const cur = t.navigation?.primary ?? [];
-      if (cur.length >= 8) return t;
-      return {
-        ...t,
-        navigation: {
-          ...(t.navigation ?? {}),
-          primary: [...cur, { label: "Nuevo", href: "/" }],
-        },
-      };
-    });
+    const cur = theme.navigation?.primary ?? [];
+    if (cur.length >= 8) return;
+    applyPublicPatch({ navigation: { primary: [...cur, { label: "Nuevo", href: "/" }] } as any });
   };
 
   const removeNavItem = (idx: number) => {
-    setTheme((t) => {
-      const cur = t.navigation?.primary ?? [];
-      return {
-        ...t,
-        navigation: {
-          ...(t.navigation ?? {}),
-          primary: cur.filter((_, i) => i !== idx),
-        },
-      };
-    });
+    const cur = theme.navigation?.primary ?? [];
+    applyPublicPatch({ navigation: { primary: cur.filter((_, i) => i !== idx) } as any });
   };
 
   return (
@@ -629,7 +620,7 @@ export default function SettingsClient({
                     <AppInput
                       className="mt-1"
                       value={theme.brandName ?? ""}
-                      onChange={(e) => setTheme({ ...theme, brandName: e.target.value })}
+                      onChange={(e) => applyPublicPatch({ brandName: e.target.value })}
                     />
                   </label>
                   <label className="text-sm">
@@ -637,7 +628,7 @@ export default function SettingsClient({
                     <AppInput
                       className="mt-1"
                       value={theme.tagline ?? ""}
-                      onChange={(e) => setTheme({ ...theme, tagline: e.target.value })}
+                      onChange={(e) => applyPublicPatch({ tagline: e.target.value })}
                     />
                   </label>
                   <label className="text-sm md:col-span-2">
@@ -645,7 +636,7 @@ export default function SettingsClient({
                     <AppInput
                       className="mt-1"
                       value={theme.logoUrl ?? ""}
-                      onChange={(e) => setTheme({ ...theme, logoUrl: e.target.value })}
+                      onChange={(e) => applyPublicPatch({ logoUrl: e.target.value })}
                       placeholder="https://..."
                     />
                   </label>
@@ -654,7 +645,7 @@ export default function SettingsClient({
                     <AppInput
                       className="mt-1"
                       value={theme.primary ?? ""}
-                      onChange={(e) => setTheme({ ...theme, primary: e.target.value })}
+                      onChange={(e) => applyPublicPatch({ primary: e.target.value })}
                       placeholder="#506a75"
                     />
                   </label>
@@ -663,7 +654,7 @@ export default function SettingsClient({
                     <AppInput
                       className="mt-1"
                       value={theme.accent ?? ""}
-                      onChange={(e) => setTheme({ ...theme, accent: e.target.value })}
+                      onChange={(e) => applyPublicPatch({ accent: e.target.value })}
                       placeholder="#cefe82"
                     />
                   </label>
@@ -857,16 +848,14 @@ export default function SettingsClient({
                     className="mt-1"
                     value={(theme.notifications?.ticketEmails ?? []).join(", ")}
                     onChange={(e) =>
-                      setTheme({
-                        ...theme,
+                      applyPublicPatch({
                         notifications: {
-                          ...(theme.notifications ?? {}),
                           ticketEmails: e.target.value
                             .split(",")
                             .map((s) => s.trim())
                             .filter(Boolean),
                         },
-                      })
+                      } as any)
                     }
                     placeholder="it@empresa.com, secops@empresa.com"
                   />
@@ -878,16 +867,14 @@ export default function SettingsClient({
                     className="mt-1"
                     value={(theme.notifications?.monitorEmails ?? []).join(", ")}
                     onChange={(e) =>
-                      setTheme({
-                        ...theme,
+                      applyPublicPatch({
                         notifications: {
-                          ...(theme.notifications ?? {}),
                           monitorEmails: e.target.value
                             .split(",")
                             .map((s) => s.trim())
                             .filter(Boolean),
                         },
-                      })
+                      } as any)
                     }
                     placeholder="alerts@empresa.com"
                   />

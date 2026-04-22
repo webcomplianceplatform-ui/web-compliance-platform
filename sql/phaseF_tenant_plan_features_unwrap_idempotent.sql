@@ -9,10 +9,15 @@ SELECT
 FROM public."TenantPlan"
 WHERE jsonb_typeof("features") = 'object'
   AND "features" ? 'features'
+  AND "features" ? 'tier'
+  AND "features" ? 'addons'
+  AND "features" ? 'overrides'
   AND NOT ("features" ? 'modules')
+  AND jsonb_typeof("features"->'tier') = 'string'
+  AND jsonb_typeof("features"->'addons') = 'object'
+  AND jsonb_typeof("features"->'overrides') = 'object'
   AND jsonb_typeof("features"->'features') = 'object'
-  AND ("features"->'features') ? 'modules'
-  AND ("features" ? 'tier' OR "features" ? 'addons' OR "features" ? 'overrides');
+  AND ("features"->'features') ? 'modules';
 
 SELECT
   "tenantId",
@@ -23,10 +28,15 @@ SELECT
 FROM public."TenantPlan"
 WHERE jsonb_typeof("features") = 'object'
   AND "features" ? 'features'
+  AND "features" ? 'tier'
+  AND "features" ? 'addons'
+  AND "features" ? 'overrides'
   AND NOT ("features" ? 'modules')
+  AND jsonb_typeof("features"->'tier') = 'string'
+  AND jsonb_typeof("features"->'addons') = 'object'
+  AND jsonb_typeof("features"->'overrides') = 'object'
   AND jsonb_typeof("features"->'features') = 'object'
   AND ("features"->'features') ? 'modules'
-  AND ("features" ? 'tier' OR "features" ? 'addons' OR "features" ? 'overrides')
 ORDER BY "updatedAt" DESC;
 
 -- 2) Repair only the wrapped-shape rows
@@ -34,10 +44,15 @@ UPDATE public."TenantPlan"
 SET "features" = "features"->'features'
 WHERE jsonb_typeof("features") = 'object'
   AND "features" ? 'features'
+  AND "features" ? 'tier'
+  AND "features" ? 'addons'
+  AND "features" ? 'overrides'
   AND NOT ("features" ? 'modules')
+  AND jsonb_typeof("features"->'tier') = 'string'
+  AND jsonb_typeof("features"->'addons') = 'object'
+  AND jsonb_typeof("features"->'overrides') = 'object'
   AND jsonb_typeof("features"->'features') = 'object'
   AND ("features"->'features') ? 'modules'
-  AND ("features" ? 'tier' OR "features" ? 'addons' OR "features" ? 'overrides')
 RETURNING "tenantId", plan;
 
 -- 3) Validate after repair
@@ -46,7 +61,12 @@ SELECT
 FROM public."TenantPlan"
 WHERE jsonb_typeof("features") = 'object'
   AND "features" ? 'features'
+  AND "features" ? 'tier'
+  AND "features" ? 'addons'
+  AND "features" ? 'overrides'
   AND NOT ("features" ? 'modules')
+  AND jsonb_typeof("features"->'tier') = 'string'
+  AND jsonb_typeof("features"->'addons') = 'object'
+  AND jsonb_typeof("features"->'overrides') = 'object'
   AND jsonb_typeof("features"->'features') = 'object'
-  AND ("features"->'features') ? 'modules'
-  AND ("features" ? 'tier' OR "features" ? 'addons' OR "features" ? 'overrides');
+  AND ("features"->'features') ? 'modules';

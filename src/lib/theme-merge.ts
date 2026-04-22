@@ -53,7 +53,7 @@ function safePath(p?: string) {
   return s;
 }
 
-export function sanitizeTheme(input: any): TenantTheme {
+function sanitizeThemeObject(input: any): Partial<TenantTheme> {
   // whitelist “manual” (lo suficiente para MVP)
   const theme: any = {};
 
@@ -150,11 +150,24 @@ export function sanitizeTheme(input: any): TenantTheme {
   }
 
 if (isObject(input?.notifications)) {
-  theme.notifications = {
-    ticketEmails: sanitizeEmailList((input.notifications as any).ticketEmails),
-    monitorEmails: sanitizeEmailList((input.notifications as any).monitorEmails),
-  };
+  const notifications: any = {};
+  if (Object.prototype.hasOwnProperty.call(input.notifications, "ticketEmails")) {
+    notifications.ticketEmails = sanitizeEmailList((input.notifications as any).ticketEmails);
+  }
+  if (Object.prototype.hasOwnProperty.call(input.notifications, "monitorEmails")) {
+    notifications.monitorEmails = sanitizeEmailList((input.notifications as any).monitorEmails);
+  }
+  if (Object.keys(notifications).length > 0) theme.notifications = notifications;
 }
 
+  return theme as Partial<TenantTheme>;
+}
+
+export function sanitizeThemePatch(input: any): Partial<TenantTheme> {
+  return sanitizeThemeObject(input);
+}
+
+export function sanitizeTheme(input: any): TenantTheme {
+  const theme = sanitizeThemeObject(input);
   return deepMerge(defaultTheme, theme);
 }

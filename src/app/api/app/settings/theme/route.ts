@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/db";
 import { requireTenantContextApi, canManageSettings } from "@/lib/tenant-auth";
-import { sanitizeTheme } from "@/lib/theme-merge";
+import { sanitizeTheme, sanitizeThemePatch } from "@/lib/theme-merge";
 import { z } from "zod";
 import { parseJson, jsonOk, jsonError } from "@/lib/api-helpers";
 import { getClientIp } from "@/lib/ip";
@@ -11,6 +11,22 @@ const ThemeUpdateSchema = z.object({
   tenant: z.string().min(1),
   theme: z.any(),
 });
+
+function isObject(v: unknown): v is Record<string, any> {
+  return !!v && typeof v === "object" && !Array.isArray(v);
+}
+
+function mergeTheme<T>(base: T, patch: any): T {
+  if (!isObject(patch)) return base;
+
+  const out: any = Array.isArray(base) ? [...(base as any)] : { ...(base as any) };
+  for (const [k, v] of Object.entries(patch)) {
+    if (v === undefined) continue;
+    if (isObject(v) && isObject((out as any)[k])) out[k] = mergeTheme((out as any)[k], v);
+    else out[k] = v;
+  }
+  return out;
+}
 
 export async function POST(req: Request) {
   const parsed = await parseJson(req, ThemeUpdateSchema);
@@ -50,7 +66,15 @@ export async function POST(req: Request) {
   });
 
   const current: any = row?.themeJson ?? {};
-  const theme: any = sanitizeTheme(patch);
+  const currentPublic: any = { ...(current ?? {}) };
+  delete currentPublic.legal;
+  delete currentPublic.legalDocs;
+  delete currentPublic.seo;
+  delete currentPublic.siteBuilder;
+  delete currentPublic.__history;
+
+  const publicPatch = sanitizeThemePatch(patch);
+  const theme: any = sanitizeTheme(mergeTheme(currentPublic, publicPatch));
 
   // Preserve hidden branches that are intentionally edited via dedicated endpoints.
   if (Object.prototype.hasOwnProperty.call(current, "legal")) theme.legal = current.legal;
