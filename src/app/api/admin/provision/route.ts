@@ -41,9 +41,9 @@ export async function POST(req: Request) {
   if (!isSuperadminEmail(actorEmail)) return forbidden();
 
   // Require a recent GLOBAL MFA verification for sensitive control-plane actions.
-  const actor = await prisma.user.findUnique({ where: { email: actorEmail }, select: { id: true } }).catch(() => null);
-  if (!actor?.id) return unauthorized();
-  const reauth = await requireRecentGlobalMfaApi({ userId: actor.id });
+  const actorUser = await prisma.user.findUnique({ where: { email: actorEmail }, select: { id: true } }).catch(() => null);
+  if (!actorUser?.id) return unauthorized();
+  const reauth = await requireRecentGlobalMfaApi({ userId: actorUser.id });
   if (!reauth.ok) return reauth.res;
 
   // ✅ Rate limit AFTER superadmin check
@@ -135,7 +135,7 @@ export async function POST(req: Request) {
   // ✅ best-effort audit
   await auditLog({
     tenantId: result.tenant.id,
-    actorUserId: actor?.id ?? null,
+    actorUserId: actorUser?.id ?? null,
     action: "admin.provision",
     targetType: "tenant",
     targetId: result.tenant.id,
