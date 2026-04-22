@@ -43,7 +43,6 @@ export async function POST(req: Request) {
     tenantSlug: tenant,
     tenantName: null,
     planLabel: plan,
-    // PDF template supports "pack" | "report". Client scoping is carried via clientUserId + bundle.client.
     reportKind: "pack",
     bundle: {
       tenantId: auth.ctx.tenantId,
@@ -79,7 +78,7 @@ export async function POST(req: Request) {
       securityAlerts: bundle.securityAlerts.map((a: any) => ({ createdAt: a.createdAt, level: a.level, message: a.message })),
       monitorEvents: bundle.monitorEvents.map((m: any) => ({ createdAt: m.createdAt, status: m.status, message: m.message, severity: m.severity })),
       incidents: ((bundle as any)?.incidents ?? []).map((t: any) => ({ createdAt: t.createdAt, title: t.title, status: t.status, priority: t.priority })),
-      client: (bundle as any)?.manifest?.client ?? null,
+      agencyClients: (bundle as any)?.agencyClients ?? [],
     } as any,
   });
 
@@ -115,6 +114,12 @@ export async function POST(req: Request) {
           alerts: bundle.securityAlerts.length,
           monitorEvents: bundle.monitorEvents.length,
           incidents: (bundle as any)?.incidents?.length ?? 0,
+          agencyClients: (bundle as any)?.agencyClients?.length ?? 0,
+          uploadedEvidence:
+            (bundle as any)?.agencyClients?.reduce(
+              (sum: number, client: any) => sum + Number(client?.uploadedEvidence?.length ?? 0),
+              0
+            ) ?? 0,
         },
       },
     },

@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import LandingClient from "@/components/marketing/LandingClient";
 
 export const metadata: Metadata = {
-  title: "WebCompliance · Control legal, operativo y seguridad visible (sin rehacer tu web)",
+  title: "WebCompliance | Compliance operations for agencies",
   description:
-    "Legal versionado, tickets, monitoring, auditoría, Security Alerts y evidencias exportables. Web opcional. Control obligatorio.",
+    "Manage client compliance with checklists, evidence, status, and traceable packs from one agency workspace.",
 };
 
 export default function Home() {

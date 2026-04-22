@@ -57,6 +57,12 @@ enum CheckStatus {
   FAIL
 }
 
+enum ComplianceCheckStatus {
+  PENDING
+  OK
+  NOT_APPLICABLE
+}
+
 enum PlanTier {
   CONTROL
   COMPLIANCE
@@ -86,9 +92,53 @@ model Tenant {
   accessEvents   AccessEvent[]
   securityAlerts SecurityAlert[]
   plan           TenantPlan?
+  clients        Client[]
 
   evidencePackSchedule EvidencePackSchedule?
   evidencePacks        EvidencePack[]
+}
+
+model Client {
+  id        String   @id @default(uuid())
+  name      String
+  tenantId  String
+  createdAt DateTime @default(now())
+
+  tenant   Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  checks   ComplianceCheck[]
+  evidence Evidence[]
+
+  @@index([tenantId, createdAt])
+}
+
+model ComplianceCheck {
+  id        String                @id @default(uuid())
+  clientId  String
+  title     String
+  status    ComplianceCheckStatus @default(PENDING)
+  createdAt DateTime              @default(now())
+  updatedAt DateTime              @updatedAt
+
+  client   Client     @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  evidence Evidence[]
+
+  @@index([clientId, createdAt])
+  @@index([clientId, updatedAt])
+}
+
+model Evidence {
+  id        String   @id @default(uuid())
+  clientId  String
+  checkId   String?
+  fileUrl   String
+  fileName  String?
+  createdAt DateTime @default(now())
+
+  client Client           @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  check  ComplianceCheck? @relation(fields: [checkId], references: [id], onDelete: SetNull)
+
+  @@index([clientId, createdAt])
+  @@index([checkId, createdAt])
 }
 
 model User {

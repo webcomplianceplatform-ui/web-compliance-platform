@@ -1,6 +1,44 @@
+import crypto from "crypto";
+import {
+  computeComplianceStatus,
+  computeLastActivityAt,
+  pendingChecksCount,
+  resolvedChecksCount,
+} from "@/lib/client-compliance";
 import { prisma } from "@/lib/db";
 
-import crypto from "crypto";
+export type AgencyEvidenceReference = {
+  id: string;
+  clientId: string;
+  clientName: string;
+  checkId?: string | null;
+  checkTitle?: string | null;
+  fileName?: string | null;
+  createdAt: string;
+  referenceType: "workspace_download" | "external_url";
+  referenceUrl: string | null;
+};
+
+export type AgencyClientEvidenceSummary = {
+  id: string;
+  name: string;
+  createdAt: string;
+  complianceStatus: "GREEN" | "YELLOW" | "RED";
+  pendingChecks: number;
+  resolvedChecks: number;
+  totalChecks: number;
+  evidenceCount: number;
+  lastActivityAt: string | null;
+  checklist: Array<{
+    id: string;
+    title: string;
+    status: string;
+    createdAt: string;
+    updatedAt: string;
+    evidenceCount: number;
+  }>;
+  uploadedEvidence: AgencyEvidenceReference[];
+};
 
 export type EvidenceBundle = {
   manifest: {
@@ -20,6 +58,8 @@ export type EvidenceBundle = {
       securityAlerts: number;
       monitorEvents: number;
       incidents: number;
+      agencyClients?: number;
+      uploadedEvidence?: number;
     };
     integrity: {
       algorithm: "sha256";
@@ -32,6 +72,7 @@ export type EvidenceBundle = {
   monitorChecks: any[];
   legalHistory: any[];
   incidents: any[];
+  agencyClients: AgencyClientEvidenceSummary[];
   digest: any;
 };
 
@@ -42,41 +83,77 @@ export async function buildEvidenceBundle(args: {
    *  Note: data is still tenant-scoped unless you model client/domain ownership.
    */
   clientUserId?: string;
+  /** Optional new agency client scope. */
+  clientId?: string;
 }): Promise<EvidenceBundle> {
   const to = new Date();
   const from = new Date(Date.now() - args.rangeDays * 24 * 60 * 60 * 1000);
 
-  const [auditEvents, securityAlerts, monitorEvents, monitorChecks, tenant, incidents] = await Promise.all([
-    prisma.auditEvent.findMany({
-      where: { tenantId: args.tenantId, createdAt: { gte: from } },
-      orderBy: { createdAt: "desc" },
-      take: 5000,
-    }),
-    prisma.securityAlert.findMany({
-      where: { tenantId: args.tenantId, createdAt: { gte: from } },
-      orderBy: { createdAt: "desc" },
-      take: 5000,
-    }),
-    prisma.monitorEvent.findMany({
-      where: { tenantId: args.tenantId, createdAt: { gte: from } },
-      orderBy: { createdAt: "desc" },
-      take: 5000,
-    }),
-    prisma.monitorCheck.findMany({
-      where: { tenantId: args.tenantId },
-      orderBy: { createdAt: "desc" },
-      take: 200,
-    }),
-    prisma.tenant.findUnique({
-      where: { id: args.tenantId },
-      select: { themeJson: true },
-    }),
-    prisma.ticket.findMany({
-      where: { tenantId: args.tenantId, createdAt: { gte: from }, type: "INCIDENT" as any },
-      orderBy: { createdAt: "desc" },
-      take: 2000,
-    }),
-  ]);
+  const [auditEvents, securityAlerts, monitorEvents, monitorChecks, tenant, incidents, agencyClientRows] =
+    await Promise.all([
+      prisma.auditEvent.findMany({
+        where: { tenantId: args.tenantId, createdAt: { gte: from } },
+        orderBy: { createdAt: "desc" },
+        take: 5000,
+      }),
+      prisma.securityAlert.findMany({
+        where: { tenantId: args.tenantId, createdAt: { gte: from } },
+        orderBy: { createdAt: "desc" },
+        take: 5000,
+      }),
+      prisma.monitorEvent.findMany({
+        where: { tenantId: args.tenantId, createdAt: { gte: from } },
+        orderBy: { createdAt: "desc" },
+        take: 5000,
+      }),
+      prisma.monitorCheck.findMany({
+        where: { tenantId: args.tenantId },
+        orderBy: { createdAt: "desc" },
+        take: 200,
+      }),
+      prisma.tenant.findUnique({
+        where: { id: args.tenantId },
+        select: { slug: true, themeJson: true },
+      }),
+      prisma.ticket.findMany({
+        where: { tenantId: args.tenantId, createdAt: { gte: from }, type: "INCIDENT" as any },
+        orderBy: { createdAt: "desc" },
+        take: 2000,
+      }),
+      prisma.client.findMany({
+        where: {
+          tenantId: args.tenantId,
+          ...(args.clientId ? { id: args.clientId } : {}),
+        },
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          name: true,
+          createdAt: true,
+          checks: {
+            orderBy: { createdAt: "asc" },
+            select: {
+              id: true,
+              title: true,
+              status: true,
+              createdAt: true,
+              updatedAt: true,
+            },
+          },
+          evidence: {
+            where: { createdAt: { gte: from } },
+            orderBy: { createdAt: "desc" },
+            select: {
+              id: true,
+              checkId: true,
+              fileName: true,
+              fileUrl: true,
+              createdAt: true,
+            },
+          },
+        },
+      }),
+    ]);
 
   const theme: any = tenant?.themeJson ?? null;
   const legalHistory = theme?.__history?.legal ?? [];
@@ -86,7 +163,54 @@ export async function buildEvidenceBundle(args: {
     logoText: theme?.logoText ?? theme?.brand?.logoText ?? null,
   };
 
+  const agencyClients = agencyClientRows.map((client) => {
+    const checkTitleById = new Map(client.checks.map((check) => [check.id, check.title]));
+    const uploadedEvidence = client.evidence.map((evidence) => ({
+      id: evidence.id,
+      clientId: client.id,
+      clientName: client.name,
+      checkId: evidence.checkId,
+      checkTitle: evidence.checkId ? checkTitleById.get(evidence.checkId) ?? null : null,
+      fileName: evidence.fileName ?? null,
+      createdAt: evidence.createdAt.toISOString(),
+      ...buildAgencyEvidenceReference({
+        tenantSlug: tenant?.slug ?? null,
+        clientId: client.id,
+        evidenceId: evidence.id,
+        fileUrl: evidence.fileUrl,
+      }),
+    }));
+
+    const lastActivityAt = computeLastActivityAt({
+      clientCreatedAt: client.createdAt,
+      checks: client.checks,
+      evidence: client.evidence,
+    });
+
+    return {
+      id: client.id,
+      name: client.name,
+      createdAt: client.createdAt.toISOString(),
+      complianceStatus: computeComplianceStatus(client.checks),
+      pendingChecks: pendingChecksCount(client.checks),
+      resolvedChecks: resolvedChecksCount(client.checks),
+      totalChecks: client.checks.length,
+      evidenceCount: uploadedEvidence.length,
+      lastActivityAt: lastActivityAt ? lastActivityAt.toISOString() : null,
+      checklist: client.checks.map((check) => ({
+        id: check.id,
+        title: check.title,
+        status: String(check.status),
+        createdAt: check.createdAt.toISOString(),
+        updatedAt: check.updatedAt.toISOString(),
+        evidenceCount: uploadedEvidence.filter((evidence) => evidence.checkId === check.id).length,
+      })),
+      uploadedEvidence,
+    } satisfies AgencyClientEvidenceSummary;
+  });
+
   const domain = inferDomainFromChecks(monitorChecks);
+  const uploadedEvidenceCount = agencyClients.reduce((sum, client) => sum + client.uploadedEvidence.length, 0);
   const digest = {
     auditByAction: countBy(auditEvents, (e: any) => e.action),
     auditByActor: countBy(auditEvents, (e: any) => e.actorUserId ?? "unknown"),
@@ -94,14 +218,15 @@ export async function buildEvidenceBundle(args: {
     monitorByStatus: countBy(monitorEvents, (m: any) => m.status),
     legalHistoryEntries: Array.isArray(legalHistory) ? legalHistory.length : 0,
     incidentCount: incidents.length,
+    agencyClientsCount: agencyClients.length,
+    uploadedEvidenceCount,
+    agencyByStatus: countBy(agencyClients, (client) => client.complianceStatus),
   };
 
-
-  // Compute integrity hash over a normalized representation.
-  // Note: this is not a cryptographic notarization; it is a deterministic checksum to detect tampering.
   const normalized = {
     tenantId: args.tenantId,
     clientUserId: args.clientUserId ?? null,
+    clientId: args.clientId ?? null,
     domain,
     rangeDays: args.rangeDays,
     from: from.toISOString(),
@@ -112,6 +237,7 @@ export async function buildEvidenceBundle(args: {
     monitorChecks,
     incidents,
     legalHistory,
+    agencyClients,
   };
   const bundleHash = sha256(stableStringify(normalized));
 
@@ -129,6 +255,8 @@ export async function buildEvidenceBundle(args: {
         securityAlerts: securityAlerts.length,
         monitorEvents: monitorEvents.length,
         incidents: incidents.length,
+        agencyClients: agencyClients.length,
+        uploadedEvidence: uploadedEvidenceCount,
       },
       integrity: {
         algorithm: "sha256",
@@ -141,7 +269,36 @@ export async function buildEvidenceBundle(args: {
     monitorChecks,
     legalHistory,
     incidents,
+    agencyClients,
     digest,
+  };
+}
+
+function buildAgencyEvidenceReference(args: {
+  tenantSlug: string | null;
+  clientId: string;
+  evidenceId: string;
+  fileUrl: string;
+}) {
+  if (args.fileUrl && !String(args.fileUrl).startsWith("data:")) {
+    return {
+      referenceType: "external_url" as const,
+      referenceUrl: String(args.fileUrl),
+    };
+  }
+
+  if (!args.tenantSlug) {
+    return {
+      referenceType: "workspace_download" as const,
+      referenceUrl: null,
+    };
+  }
+
+  return {
+    referenceType: "workspace_download" as const,
+    referenceUrl: `/api/app/clients/${args.clientId}/evidence/${args.evidenceId}?tenant=${encodeURIComponent(
+      args.tenantSlug
+    )}`,
   };
 }
 

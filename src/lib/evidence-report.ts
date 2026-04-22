@@ -33,6 +33,24 @@ type Bundle = {
   securityAlerts: Array<{ createdAt: string; level: string; message: string }>;
   monitorEvents: Array<{ createdAt: string; status: string; message: string; severity: number }>;
   incidents: Array<{ createdAt: string; title: string; status: string; priority: string }>;
+  agencyClients?: Array<{
+    id: string;
+    name: string;
+    complianceStatus: string;
+    pendingChecks: number;
+    resolvedChecks: number;
+    totalChecks: number;
+    evidenceCount: number;
+    lastActivityAt?: string | null;
+    uploadedEvidence: Array<{
+      id: string;
+      createdAt: string;
+      fileName?: string | null;
+      checkTitle?: string | null;
+      referenceType?: string | null;
+      referenceUrl?: string | null;
+    }>;
+  }>;
 };
 
 function fmtDate(iso: string) {
@@ -205,16 +223,98 @@ export async function buildEvidencePdfReport(opts: {
   ensureSpace(120);
   page.drawText("Executive summary", { x: marginX, y, size: 12, font: fontBold });
   y -= 16;
+  const agencyClients = bundle.agencyClients || [];
+  const agencyEvidenceCount = agencyClients.reduce((sum, client) => sum + client.uploadedEvidence.length, 0);
   const summaryLines = [
     `Audit events: ${bundle.summary.auditCount}`,
     `Security alerts: ${bundle.summary.alertsCount}`,
     `Monitoring events: ${bundle.summary.monitorEventsCount} (checks: ${bundle.summary.monitorChecksCount})`,
     `Incidents: ${bundle.summary.incidentsCount}`,
     `Domains: ${domains.length}`,
+    ...(agencyClients.length
+      ? [
+          `Agency clients: ${agencyClients.length}`,
+          `Uploaded proof references: ${agencyEvidenceCount}`,
+        ]
+      : []),
   ];
   for (const line of summaryLines) {
     page.drawText(line, { x: marginX + 10, y, size: 10, font });
     y -= 14;
+  }
+
+  if (agencyClients.length) {
+    ensureSpace(120);
+    page.drawText("Agency client compliance", { x: marginX, y, size: 12, font: fontBold });
+    y -= 16;
+
+    for (const client of agencyClients.slice(0, 8)) {
+      ensureSpace(42);
+      page.drawText(`${client.name} | ${client.complianceStatus}`, { x: marginX + 10, y, size: 10, font: fontBold });
+      y -= 13;
+      page.drawText(
+        `${client.resolvedChecks}/${client.totalChecks} reviewed | ${client.pendingChecks} pending | ${client.evidenceCount} evidence files`,
+        { x: marginX + 18, y, size: 9, font, color: rgb(0.25, 0.25, 0.25) }
+      );
+      y -= 12;
+
+      const latestEvidence = client.uploadedEvidence[0];
+      page.drawText(
+        latestEvidence
+          ? `Latest proof: ${(latestEvidence.fileName || "Uploaded evidence").slice(0, 42)} | ${(latestEvidence.checkTitle || "General").slice(0, 28)} | ${fmtDate(latestEvidence.createdAt)}`
+          : "No uploaded agency evidence in this period.",
+        { x: marginX + 18, y, size: 9, font, color: rgb(0.35, 0.35, 0.35) }
+      );
+      y -= 16;
+    }
+
+    if (agencyClients.length > 8) {
+      ensureSpace(12);
+      page.drawText(`+ ${agencyClients.length - 8} more clients in the exported JSON bundle`, {
+        x: marginX + 10,
+        y,
+        size: 9,
+        font,
+        color: rgb(0.35, 0.35, 0.35),
+      });
+      y -= 14;
+    }
+
+    const proofReferences = agencyClients.flatMap((client) =>
+      client.uploadedEvidence.slice(0, 3).map((evidence) => ({
+        clientName: client.name,
+        fileName: evidence.fileName || "Uploaded evidence",
+        checkTitle: evidence.checkTitle || "General",
+        createdAt: evidence.createdAt,
+      }))
+    );
+
+    if (proofReferences.length) {
+      ensureSpace(120);
+      page.drawText("Uploaded proof references", { x: marginX, y, size: 12, font: fontBold });
+      y -= 16;
+
+      for (const proof of proofReferences.slice(0, 18)) {
+        ensureSpace(14);
+        page.drawText(
+          `${proof.clientName.slice(0, 18)} | ${proof.checkTitle.slice(0, 18)} | ${proof.fileName.slice(0, 24)} | ${fmtDate(proof.createdAt)}`,
+          { x: marginX + 10, y, size: 9, font, color: rgb(0.25, 0.25, 0.25) }
+        );
+        y -= 12;
+      }
+
+      if (proofReferences.length > 18) {
+        ensureSpace(12);
+        page.drawText(`+ ${proofReferences.length - 18} more proof references in the exported JSON bundle`, {
+          x: marginX + 10,
+          y,
+          size: 9,
+          font,
+          color: rgb(0.35, 0.35, 0.35),
+        });
+        y -= 14;
+      }
+    }
   }
 
   // Domain sections (customer-ready)

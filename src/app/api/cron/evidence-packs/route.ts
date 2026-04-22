@@ -101,6 +101,7 @@ export async function GET(req: Request) {
         securityAlerts: bundle.securityAlerts.map((a: any) => ({ createdAt: a.createdAt, level: a.level, message: a.message })),
         monitorEvents: bundle.monitorEvents.map((m: any) => ({ createdAt: m.createdAt, status: m.status, message: m.message, severity: m.severity })),
         incidents: ((bundle as any)?.incidents ?? []).map((t: any) => ({ createdAt: t.createdAt, title: t.title, status: t.status, priority: t.priority })),
+        agencyClients: (bundle as any)?.agencyClients ?? [],
       } as any,
     });
 
@@ -120,7 +121,16 @@ export async function GET(req: Request) {
         sizeBytes: up.sizeBytes,
         sha256: up.sha256,
         finalizedAt: createdAt,
-        metaJson: { days, scheduled: true },
+        metaJson: {
+          days,
+          scheduled: true,
+          agencyClients: (bundle as any)?.agencyClients?.length ?? 0,
+          uploadedEvidence:
+            (bundle as any)?.agencyClients?.reduce(
+              (sum: number, client: any) => sum + Number(client?.uploadedEvidence?.length ?? 0),
+              0
+            ) ?? 0,
+        },
       },
     });
 

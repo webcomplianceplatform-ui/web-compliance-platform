@@ -52,7 +52,6 @@ export default function PacksClient({ tenant }: { tenant: string }) {
   async function load() {
     setMsg(null);
 
-    // schedule
     const r = await fetch(`${apiBase}/schedule?tenant=${encodeURIComponent(tenant)}`);
     const j = await safeJson(r);
     if (j?.ok) {
@@ -69,7 +68,6 @@ export default function PacksClient({ tenant }: { tenant: string }) {
       setSchedule(next);
     }
 
-    // plan
     try {
       const pr = await fetch(`/api/app/settings/plan?tenant=${encodeURIComponent(tenant)}`, { cache: "no-store" });
       const pj = await safeJson(pr);
@@ -78,14 +76,13 @@ export default function PacksClient({ tenant }: { tenant: string }) {
       // ignore
     }
 
-    // clients (Agency only)
     try {
       const ur = await fetch(`/api/app/tenants/${encodeURIComponent(tenant)}/users`, { cache: "no-store" });
       const uj = await safeJson(ur);
       if (uj?.ok && Array.isArray(uj.members)) {
-        const c = (uj.members as Member[]).filter((m) => String(m.role).toUpperCase() === "CLIENT");
-        setClients(c);
-        if (!selectedClientUserId && c.length) setSelectedClientUserId(c[0].userId);
+        const clientUsers = (uj.members as Member[]).filter((member) => String(member.role).toUpperCase() === "CLIENT");
+        setClients(clientUsers);
+        if (!selectedClientUserId && clientUsers.length) setSelectedClientUserId(clientUsers[0].userId);
       }
     } catch {
       // ignore
@@ -136,7 +133,7 @@ export default function PacksClient({ tenant }: { tenant: string }) {
       });
       const j = await safeJson(r);
       if (!j?.ok) throw new Error(j?.error || "generate_failed");
-      setMsg("Evidence pack generated. Downloading latest…");
+      setMsg("Evidence pack generated. Downloading latest...");
 
       const qs = scope === "client" ? `&clientUserId=${encodeURIComponent(selectedClientUserId)}` : "";
       window.location.href = `${apiBase}/latest?tenant=${encodeURIComponent(tenant)}${qs}`;
@@ -157,7 +154,7 @@ export default function PacksClient({ tenant }: { tenant: string }) {
         <div>
           <h1 className="text-2xl font-semibold">Evidence Packs</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Downloadable, customer-ready exports — branded, shareable, integrity-checked.
+            Downloadable, client-ready exports with audit activity, checklist summaries, and proof references.
           </p>
         </div>
         <Link href={`/app/${tenant}/evidence/bundles`} className="rounded-xl border bg-bg2/50 px-3 py-2 text-sm hover:bg-bg2">
@@ -171,7 +168,9 @@ export default function PacksClient({ tenant }: { tenant: string }) {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <div className="text-sm font-semibold">Generate pack now</div>
-            <div className="mt-1 text-xs text-muted-foreground">Great for demos — it looks like a real deliverable.</div>
+            <div className="mt-1 text-xs text-muted-foreground">
+              Great for demos - the main pack now includes agency client checklist status and uploaded proof references.
+            </div>
           </div>
           <div className="rounded-full border bg-bg2/50 px-3 py-1 text-xs text-muted-foreground">
             Plan: <span className="font-semibold text-foreground">{planKey(plan)}</span>
@@ -205,7 +204,12 @@ export default function PacksClient({ tenant }: { tenant: string }) {
 
         {isAgency ? (
           <div className="mt-4 rounded-xl border bg-bg2/30 p-3">
-            <div className="text-sm font-semibold">Client-scoped pack (Agency)</div>
+            <div className="text-sm font-semibold">Legacy client-user pack</div>
+            <div className="mt-1 text-xs text-muted-foreground">
+              The main tenant pack above already includes the new agency client records. This section only applies to
+              legacy CLIENT users.
+            </div>
+
             <div className="mt-2 flex flex-wrap items-end gap-2">
               <div className="min-w-[260px]">
                 <label className="text-xs text-muted-foreground">Client</label>
@@ -215,9 +219,9 @@ export default function PacksClient({ tenant }: { tenant: string }) {
                   className="mt-1 w-full rounded-xl border bg-transparent px-3 py-2 text-sm"
                 >
                   {clients.length ? (
-                    clients.map((c) => (
-                      <option key={c.userId} value={c.userId}>
-                        {(c.name ? `${c.name} — ` : "") + c.email}
+                    clients.map((client) => (
+                      <option key={client.userId} value={client.userId}>
+                        {(client.name ? `${client.name} - ` : "") + client.email}
                       </option>
                     ))
                   ) : (
@@ -242,7 +246,7 @@ export default function PacksClient({ tenant }: { tenant: string }) {
               </a>
             </div>
             <div className="mt-2 text-xs text-muted-foreground">
-              Tip: create CLIENT users in Users → they appear here automatically.
+              Tip: create CLIENT users in Users and they will appear here automatically.
             </div>
           </div>
         ) : null}
@@ -263,7 +267,7 @@ export default function PacksClient({ tenant }: { tenant: string }) {
           </div>
 
           <div>
-            <label className="text-xs text-muted-foreground">Day of month (1–28)</label>
+            <label className="text-xs text-muted-foreground">Day of month (1-28)</label>
             <input
               value={schedule?.dayOfMonth ?? 1}
               onChange={(e) => setSchedule((s) => (s ? { ...s, dayOfMonth: Number(e.target.value || 1) } : s))}
@@ -275,7 +279,7 @@ export default function PacksClient({ tenant }: { tenant: string }) {
           </div>
 
           <div>
-            <label className="text-xs text-muted-foreground">Hour (0–23)</label>
+            <label className="text-xs text-muted-foreground">Hour (0-23)</label>
             <input
               value={schedule?.hour ?? 9}
               onChange={(e) => setSchedule((s) => (s ? { ...s, hour: Number(e.target.value || 9) } : s))}

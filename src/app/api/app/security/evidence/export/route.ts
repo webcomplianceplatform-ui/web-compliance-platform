@@ -91,6 +91,7 @@ export async function GET(req: Request) {
           status: t.status,
           priority: t.priority,
         })),
+        agencyClients: (bundle as any)?.agencyClients ?? [],
       } as any,
     });
 
