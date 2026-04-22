@@ -44,7 +44,20 @@ export async function POST(req: Request) {
     return jsonError("invalid_theme", 400);
   }
 
-  const theme = sanitizeTheme(patch);
+  const row = await prisma.tenant.findUnique({
+    where: { id: auth.ctx.tenantId },
+    select: { themeJson: true },
+  });
+
+  const current: any = row?.themeJson ?? {};
+  const theme: any = sanitizeTheme(patch);
+
+  // Preserve hidden branches that are intentionally edited via dedicated endpoints.
+  if (Object.prototype.hasOwnProperty.call(current, "legal")) theme.legal = current.legal;
+  if (Object.prototype.hasOwnProperty.call(current, "legalDocs")) theme.legalDocs = current.legalDocs;
+  if (Object.prototype.hasOwnProperty.call(current, "seo")) theme.seo = current.seo;
+  if (Object.prototype.hasOwnProperty.call(current, "siteBuilder")) theme.siteBuilder = current.siteBuilder;
+  if (Object.prototype.hasOwnProperty.call(current, "__history")) theme.__history = current.__history;
 
   await prisma.tenant.update({
     where: { id: auth.ctx.tenantId },

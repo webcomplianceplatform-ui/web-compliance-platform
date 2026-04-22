@@ -125,12 +125,7 @@ export async function POST(req: Request) {
       create: {
         tenantId: tenant.id,
         plan: "COMPLIANCE",
-        features: {
-          tier: "COMPLIANCE",
-          addons: { webSimple: false, security: false },
-          overrides: {},
-          features: buildPlanPayload({ plan: "COMPLIANCE" }),
-        },
+        features: buildPlanPayload({ plan: "COMPLIANCE" }),
       },
     });
 
